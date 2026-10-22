@@ -1,0 +1,17 @@
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import '@fontsource-variable/plus-jakarta-sans';
+import App from './App';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { initMonitoring } from './lib/monitoring';
+import './index.css';
+
+void initMonitoring();
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  </React.StrictMode>
+);

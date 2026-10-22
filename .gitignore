@@ -1,0 +1,10 @@
+dist/
+dist-e2e/
+dev-dist/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+backend/
+node_modules/
