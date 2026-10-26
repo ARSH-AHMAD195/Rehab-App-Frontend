@@ -4,8 +4,43 @@
 // credential is ever readable from JavaScript. With VITE_USE_MOCK=true, requests are served
 // by the in-browser mock in src/mocks instead (dev/demo only; excluded from production builds).
 import type { ValidationErrorBody } from '../types/api';
+import { firebaseAuth } from '../lib/firebase';
 
-const BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '');
+
+const AUTH_API_URL = (
+  import.meta.env.VITE_AUTH_API_URL || '/api/v1'
+).replace(/\/$/, '');
+
+const HEALTH_API_URL = (
+  import.meta.env.VITE_HEALTH_API_URL || AUTH_API_URL
+).replace(/\/$/, '');
+
+const EXERCISE_API_URL = (
+  import.meta.env.VITE_EXERCISE_API_URL || AUTH_API_URL
+).replace(/\/$/, '');
+
+const getApiBaseUrl = (path: string): string => {
+  if (
+    path.startsWith('/vital-types') ||
+    path.startsWith('/me/vitals') ||
+    path.startsWith('/doctor/alerts')
+  ) {
+    return HEALTH_API_URL;
+  }
+
+  if (
+    path.startsWith('/exercise-categories') ||
+    path.startsWith('/exercises') ||
+    path.startsWith('/exercise-completions') ||
+    path.startsWith('/patients/me/exercise-plan') ||
+    path.startsWith('/patients/me/exercise-checklist')
+  ) {
+    return EXERCISE_API_URL;
+  }
+
+  return AUTH_API_URL;
+};
+
 const TIMEOUT_MS = 30_000;
 export const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
 
@@ -51,32 +86,99 @@ const toQuery = (params: QueryParams = {}) => {
   return s ? `?${s}` : '';
 };
 
-const httpRequest = async (method: string, path: string, { body, params, responseType }: RequestOptions): Promise<unknown> => {
+
+
+const httpRequest = async (
+  method: string,
+  path: string,
+  { body, params, responseType }: RequestOptions
+): Promise<unknown> => {
   let res: Response;
+
   try {
-    res = await fetch(`${BASE_URL}${path}${toQuery(params)}`, {
-      method,
-      credentials: 'include',
-      headers: body === undefined ? { Accept: 'application/json' } : { Accept: 'application/json', 'Content-Type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
+    // Get the current Firebase user's ID token.
+    const firebaseUser = firebaseAuth.currentUser;
+    const token = firebaseUser
+      ? await firebaseUser.getIdToken()
+      : null;
+
+    // Prepare request headers.
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+    };
+
+    if (body !== undefined) {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    // Select the appropriate backend API.
+    const baseUrl = getApiBaseUrl(path);
+
+    res = await fetch(
+      `${baseUrl}${path}${toQuery(params)}`,
+      {
+        method,
+        headers,
+        cache: 'no-store',
+        body:
+          body === undefined
+            ? undefined
+            : JSON.stringify(body),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      }
+    );
   } catch (err) {
+    const error = err as Error;
+
     throw new ApiError(
       0,
-      (err as Error).name === 'TimeoutError'
+      error.name === 'TimeoutError'
         ? 'The server took too long to respond. Please try again.'
         : 'Unable to reach the server. Check your connection and try again.'
     );
   }
 
-  if (!res.ok) {
-    const data = (await res.json().catch(() => null)) as Partial<ValidationErrorBody> | null;
-    throw new ApiError(res.status, data?.message || `Request failed (${res.status}).`, data);
+  // Handle 304 before the generic error check.
+  // A 304 response has no response body to parse.
+  if (res.status === 304) {
+    throw new ApiError(
+      304,
+      'The server returned a cached response. Please retry.'
+    );
   }
-  if (responseType === 'blob') return res.blob();
-  return res.status === 204 ? null : res.json();
+
+  // Handle unsuccessful HTTP responses.
+  if (!res.ok) {
+    const data = (await res.json().catch(() => null)) as
+      | Partial<ValidationErrorBody>
+      | null;
+
+    throw new ApiError(
+      res.status,
+      data?.message || `Request failed (${res.status}).`,
+      data
+    );
+  }
+
+  // Handle file downloads.
+  if (responseType === 'blob') {
+    return res.blob();
+  }
+
+  // Handle responses without a body.
+  if (res.status === 204) {
+    return null;
+  }
+
+  // Parse JSON response.
+  return res.json();
 };
+
+
 
 // Written inline (not via USE_MOCK) so the bundler can statically drop the mock chunk entirely.
 const loadMock = import.meta.env.VITE_USE_MOCK === 'true' ? () => import('../mocks/handlers.js') : null;

@@ -74,23 +74,33 @@ const BottomTabs = ({ items }: { items: NavItem[] }) => (
   </nav>
 );
 
-const NavItems = ({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => void }) =>
-  items.map(({ label, to, icon: Icon }) => (
-    <NavLink
-      key={to}
-      to={to}
-      onClick={onNavigate}
-      className={({ isActive }) =>
-        cn(
-          'flex min-h-11 items-center gap-3 rounded-xl px-3.5 py-2.5 text-base font-medium transition-colors',
-          isActive ? 'bg-teal-50 font-semibold text-teal-900' : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-        )
-      }
-    >
-      <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
-      <span>{label}</span>
-    </NavLink>
-  ));
+
+const NavItems = ({
+    items = [],
+    onNavigate,
+  }: {
+    items?: NavItem[];
+    onNavigate?: () => void;
+  }) =>
+    items.map(({ label, to, icon: Icon }) => (
+      <NavLink
+        key={to}
+        to={to}
+        onClick={onNavigate}
+        className={({ isActive }) =>
+          cn(
+            'flex min-h-11 items-center gap-3 rounded-xl px-3.5 py-2.5 text-base font-medium transition-colors',
+            isActive
+              ? 'bg-teal-50 font-semibold text-teal-900'
+              : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+          )
+        }
+      >
+        <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+        <span>{label}</span>
+      </NavLink>
+    ));
+
 
 export const DashboardLayout = () => {
   const user = useSignedInUser();
@@ -110,9 +120,17 @@ export const DashboardLayout = () => {
     mainRef.current?.focus();
   }, [pathname]);
 
-  const navItems = NAV[user.role];
-  const useBottomTabs = user.role === 'patient';
-  const displayName = user.role === 'doctor' ? `Dr. ${user.lastName}` : `${user.firstName} ${user.lastName}`;
+  
+  const role = user.role.toLowerCase() as Role;
+
+  const navItems = NAV[role];
+  const useBottomTabs = role === 'patient';
+
+  const displayName =
+    role === 'doctor'
+      ? `Dr. ${user.lastName}`
+      : `${user.firstName} ${user.lastName}`;
+
 
   const handleLogout = async () => {
     await logout();
@@ -152,7 +170,14 @@ export const DashboardLayout = () => {
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-teal-700 font-bold text-white">{initials(user)}</div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-base font-semibold text-slate-900">{displayName}</p>
-              <span className={cn('inline-block rounded-full border px-2 py-0.5 text-xs font-bold uppercase tracking-wide', ROLE_BADGE[user.role])}>{user.role}</span>
+              <span
+                className={cn(
+                  'inline-block rounded-full border px-2 py-0.5 text-xs font-bold uppercase tracking-wide',
+                  ROLE_BADGE[role]
+                )}
+              >
+                {role}
+              </span>
             </div>
           </div>
         </div>

@@ -31,36 +31,41 @@ import type {
 export { authService } from './authService';
 
 export const patientService = {
-  getMyProfile: () => api.get<MyProfileResponse>('/patients/me'),
-  updateMyProfile: (data: { phone?: string; emergencyContact?: EmergencyContact }) =>
-    api.patch<Ok & { profile: PatientProfile }>('/patients/me', data),
-  getMyTimeline: () => api.get<Ok & { timeline: TimelineItem[] }>('/patients/me/timeline'),
-  getPatients: (params?: { search?: string; page?: number; limit?: number }) =>
-    api.get<Ok & Paginated & { patients: PatientListItem[] }>('/patients', params),
-  getPatientById: (id: Id) => api.get<PatientChartResponse>(`/patients/${id}`),
-  getPatientTimeline: (id: Id) => api.get<Ok & { timeline: TimelineItem[] }>(`/patients/${id}/timeline`),
+  getMyProfile: () =>
+    api.get('/users/me/profile'),
+
+  updateMyProfile: (data: {
+    name?: string;
+    timeZone?: string;
+  }) =>
+    api.patch('/users/me/profile', data),
+
+  getPatients: (params?: {
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) =>
+    api.get('/patients', params),
 };
 
 export const exerciseService = {
-  getLibrary: (params?: { category?: string; search?: string; activeOnly?: string }) =>
-    api.get<Ok & { exercises: Exercise[] }>('/exercises/library', params),
-  createExercise: (data: Omit<Exercise, '_id' | 'isActive' | 'safetyNotes'> & { safetyNotes?: string }) =>
-    api.post<Ok & { exercise: Exercise }>('/exercises', data),
-  updateExercise: (id: Id, data: Partial<Exercise>) => api.patch<Ok & { exercise: Exercise }>(`/exercises/${id}`, data),
-  deactivateExercise: (id: Id) => api.delete<Ok>(`/exercises/${id}`),
-  getMyAssigned: () => api.get<Ok & { assignments: ExerciseAssignment[] }>('/exercises/assigned'),
-  assignExercise: (data: {
-    patientId: Id;
-    exerciseId: Id;
-    frequency: string;
-    customizedDurationMinutes: number;
-    customizedSets: number;
-    customizedReps: number;
-    customizedInstructions: string;
-  }) => api.post<Ok & { assignment: ExerciseAssignment }>('/exercises/assign', data),
-  logSession: (data: { assignmentId: Id; durationMinutes: number; perceivedExertion: number; patientFeedback: string; status: 'completed' }) =>
-    api.post<Ok & { session: ExerciseSession }>('/exercise-sessions', data),
-  getMySessions: (params: { days: number }) => api.get<Ok & { sessions: ExerciseSession[] }>('/exercise-sessions/me', params),
+  getLibrary: (params?: {
+    category?: string;
+    search?: string;
+  }) =>
+    api.get('/exercises', params),
+
+  getMyPlan: () =>
+    api.get('/patients/me/exercise-plan'),
+
+  getMyChecklist: () =>
+    api.get('/patients/me/exercise-checklist'),
+
+  getMyCompletions: () =>
+    api.get('/patients/me/exercise-completions'),
+
+  completeExercise: (data: Record<string, unknown>) =>
+    api.post('/exercise-completions', data),
 };
 
 export interface NewMeasurement {
@@ -75,12 +80,14 @@ export interface NewMeasurement {
 type MeasurementQuery = { type?: string; days?: number | 'all' };
 
 export const healthService = {
-  logMeasurement: (data: NewMeasurement) =>
-    api.post<Ok & { measurement: HealthMeasurement; guidanceNotice: string | null }>('/health-measurements', data),
-  getMyMeasurements: (params: MeasurementQuery) =>
-    api.get<Ok & { measurements: HealthMeasurement[] }>('/health-measurements/me', params as QueryParams),
-  getPatientMeasurements: (patientId: Id, params: MeasurementQuery) =>
-    api.get<Ok & { measurements: HealthMeasurement[] }>(`/health-measurements/patient/${patientId}`, params as QueryParams),
+  getMyTodayVitals: () =>
+    api.get('/me/vitals/today'),
+
+  getMyVitalLogs: (params?: QueryParams) =>
+    api.get('/me/vitals/logs', params),
+
+  getMyVitalTrends: (params?: QueryParams) =>
+    api.get('/me/vitals/trends', params),
 };
 
 export const reportService = {
@@ -120,10 +127,13 @@ export const adminService = {
 };
 
 export const doctorService = {
-  getAlerts: () => api.get<Ok & { alerts: PatientAlert[] }>('/doctors/alerts'),
+  getAlerts: () =>
+    api.get('/doctor/alerts'),
 };
 
 export const consentService = {
   getMyConsents: () => api.get<ConsentStatusResponse>('/consent'),
   recordConsents: (consents: { consentType: string; agreed: boolean }[]) => api.post<Ok>('/consent', { consents }),
 };
+
+

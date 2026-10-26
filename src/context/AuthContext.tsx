@@ -4,6 +4,8 @@ import { authService } from '../services/authService';
 import { onUnauthorized } from '../services/api';
 import { setMonitoringUser } from '../lib/monitoring';
 import type { User } from '../types/api';
+import { onAuthStateChanged } from 'firebase/auth';
+import { firebaseAuth } from '../lib/firebase';
 
 export type EndReason = 'expired' | 'idle' | null;
 
@@ -36,16 +38,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 
   // The session is an httpOnly cookie, so the only way to know who's signed in is to ask.
-  useEffect(() => {
-    authService
-      .getMe()
-      .then((res) => {
-        setUser(res.user);
-        setMonitoringUser(res.user);
-      })
-      .catch(() => setUser(null))
-      .finally(() => setLoading(false));
+  
+
+useEffect(() => {
+  const unsubscribe = onAuthStateChanged(firebaseAuth, async (firebaseUser) => {
+      console.log('Firebase state:', firebaseUser?.email ?? 'signed out');
+
+      if (!firebaseUser) {
+        setUser(null);
+        setMonitoringUser(null);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        await firebaseUser.getIdToken();
+
+        const user = await authService.getMe();
+
+        console.log('Restored backend user:', user.role);
+
+        setUser(user);
+        setMonitoringUser(user);
+      } catch (error) {
+        console.error('Session restoration failed:', error);
+        await firebaseAuth.signOut().catch(() => {});
+        setUser(null);
+        setMonitoringUser(null);
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    return unsubscribe;
   }, []);
+
+
 
   // Any 401 from a protected endpoint means the cookie expired or was revoked.
   const userRef = useRef(user);
@@ -55,13 +83,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => onUnauthorized(() => {});
   }, [signedOut]);
 
-  const login = useCallback(async (credentials: { email: string; password: string }) => {
-    const res = await authService.login(credentials);
-    setEndReason(null);
-    setUser(res.user);
-    setMonitoringUser(res.user);
-    return res.user;
-  }, []);
+  
+  const login = useCallback(
+    async (credentials: { email: string; password: string }): Promise<User> => {
+      try {
+        const user = await authService.login(credentials);
+        console.log('Login succeeded:', {
+          id: user._id,
+          role: user.role,
+        });
+        setUser(user);
+        setMonitoringUser(user);
+        setEndReason(null);
+
+        return user;
+      } catch (error) {
+        console.error('Login failed:', error);
+        throw error;
+      }
+    },
+    []
+  );
+
 
   const logout = useCallback(
     async (reason: EndReason = null) => {

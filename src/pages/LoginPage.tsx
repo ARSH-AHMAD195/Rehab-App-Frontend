@@ -22,7 +22,17 @@ const END_MESSAGES: Record<Exclude<EndReason, null>, string> = {
 };
 
 /** Send users back where they were headed, but only within their own role's area. */
-const destinationFor = (user: User, from?: string) => (from?.startsWith(`/${user.role}/`) ? from : HOME_BY_ROLE[user.role]);
+const destinationFor = (user: User, from?: string) => {
+  const role = user.role.toLowerCase() as keyof typeof HOME_BY_ROLE;
+
+  const home = HOME_BY_ROLE[role] ?? '/login';
+
+  const normalizedFrom = from?.toLowerCase();
+
+  return normalizedFrom?.startsWith(`/${role}/`)
+    ? from!
+    : home;
+};
 
 export const LoginPage = () => {
   const { user, login } = useAuth();
