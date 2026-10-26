@@ -4,30 +4,26 @@ import { Play, Search } from 'lucide-react';
 import { exerciseService } from '../../services/apiServices';
 import { qk } from '../../lib/queryClient';
 import { useDebouncedValue } from '../../lib/hooks';
-import { EXERCISE_CATEGORIES } from '../../lib/constants';
 import { labelize } from '../../lib/format';
 import { Badge, Button, Card, EmptyState, ErrorState, Input, PageHeader, PageLoader, Select } from '../../components/ui';
 import { ExerciseDetailModal } from '../../components/exercise/ExerciseDetailModal';
 import type { Exercise } from '../../types/api';
 
 export const DoctorExercisesPage = () => {
-  const [category, setCategory] = useState('all');
+  const [category, setCategory] = useState('');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Exercise | null>(null);
   const debouncedSearch = useDebouncedValue(search.trim());
-  const params = { category, search: debouncedSearch };
+  const params = { category: category || undefined, q: debouncedSearch || undefined, limit: 100 };
 
-  const library = useQuery({
-    queryKey: qk.library(params),
-    queryFn: () => exerciseService.getLibrary(params).then((r) => r.exercises),
-    placeholderData: keepPreviousData,
-  });
+  const categories = useQuery({ queryKey: qk.categories(), queryFn: () => exerciseService.getCategories() });
+  const library = useQuery({ queryKey: qk.library(params), queryFn: () => exerciseService.list(params).then((r) => r.data), placeholderData: keepPreviousData });
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Exercise catalog"
-        description="Approved physical, aerobic and breathing prehabilitation exercises"
+        description="The clinic’s exercise library, to choose from when assigning a plan"
         actions={
           <>
             <div className="relative">
@@ -35,10 +31,10 @@ export const DoctorExercisesPage = () => {
               <Input type="search" aria-label="Search exercises" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search exercises…" className="pl-9" />
             </div>
             <Select aria-label="Filter by category" value={category} onChange={(e) => setCategory(e.target.value)} className="w-auto">
-              <option value="all">All categories</option>
-              {EXERCISE_CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {labelize(c)}
+              <option value="">All categories</option>
+              {(categories.data ?? []).map((c) => (
+                <option key={c.id} value={c.code}>
+                  {c.name}
                 </option>
               ))}
             </Select>
@@ -52,33 +48,19 @@ export const DoctorExercisesPage = () => {
         <PageLoader label="Loading exercise catalog…" />
       ) : library.data.length === 0 ? (
         <Card>
-          <EmptyState>No exercises match these filters.</EmptyState>
+          <EmptyState>{params.q || params.category ? 'No exercises match these filters.' : 'The library is empty. An admin needs to add exercises.'}</EmptyState>
         </Card>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3" aria-busy={library.isFetching}>
           {library.data.map((ex) => (
-            <article key={ex._id} className="flex flex-col justify-between rounded-3xl border border-slate-200 bg-white p-6 shadow-xs">
+            <article key={ex.id} className="flex flex-col justify-between rounded-3xl border border-slate-200 bg-white p-6 shadow-xs">
               <div>
                 <div className="mb-2 flex items-center justify-between">
                   <Badge tone="teal">{labelize(ex.category)}</Badge>
-                  <span className="text-sm text-slate-600">{ex.defaultDurationMinutes} min</span>
+                  {!ex.video && <span className="text-xs text-slate-600">No video yet</span>}
                 </div>
-                <h2 className="text-lg font-bold leading-snug text-slate-900">{ex.title}</h2>
-                <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-slate-700">{ex.description}</p>
-                <dl className="mt-4 flex justify-between rounded-2xl bg-slate-50 p-3 text-center">
-                  <div>
-                    <dt className="text-xs font-semibold uppercase text-slate-600">Sets</dt>
-                    <dd className="font-bold text-slate-900">{ex.defaultSets}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-semibold uppercase text-slate-600">Reps</dt>
-                    <dd className="font-bold text-slate-900">{ex.defaultReps}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-semibold uppercase text-slate-600">Frequency</dt>
-                    <dd className="text-sm font-bold text-slate-900">{ex.defaultFrequency}</dd>
-                  </div>
-                </dl>
+                <h2 className="text-lg font-bold leading-snug text-slate-900">{ex.name}</h2>
+                {ex.description && <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-slate-700">{ex.description}</p>}
               </div>
               <Button variant="secondary" size="sm" className="mt-4 w-full" onClick={() => setSelected(ex)}>
                 <Play className="h-4 w-4 text-teal-700" aria-hidden="true" />

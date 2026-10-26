@@ -1,12 +1,13 @@
-import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Badge, Card } from '../ui';
-import type { TrendKey, TrendRow } from '../../lib/trends';
 
 const TOOLTIP_STYLE = { backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '13px' };
 const AXIS_TICK = { fontSize: 12, fill: '#475569' };
 
+export type TrendRow = { label: string } & Record<string, number | null | string>;
+
 export interface TrendSeries {
-  key: TrendKey;
+  key: string;
   name: string;
   color: string;
 }
@@ -15,32 +16,36 @@ export const TrendChart = ({
   title,
   subtitle,
   badge,
+  actions,
   data,
   series,
   kind = 'line',
-  domain,
+  limits = [],
   className,
 }: {
   title: string;
   subtitle?: string;
   badge?: string;
+  actions?: React.ReactNode;
   data: TrendRow[];
   series: TrendSeries[];
   kind?: 'line' | 'bar';
-  domain?: [number, number];
+  /** Alert thresholds, drawn as dashed lines. */
+  limits?: { value: number; label: string }[];
   className?: string;
 }) => {
-  const hasData = data.some((row) => series.some((s) => row[s.key] !== undefined));
+  const hasData = data.some((row) => series.some((s) => typeof row[s.key] === 'number'));
   const Chart = kind === 'bar' ? BarChart : LineChart;
 
   return (
     <Card className={className}>
-      <div className="mb-4 flex items-start justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-bold text-slate-900">{title}</h2>
           {subtitle && <p className="text-sm text-slate-600">{subtitle}</p>}
         </div>
         {badge && <Badge tone="teal">{badge}</Badge>}
+        {actions}
       </div>
 
       <div className="h-64 w-full">
@@ -49,9 +54,12 @@ export const TrendChart = ({
             <Chart data={data} accessibilityLayer>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="label" stroke="#94a3b8" tick={AXIS_TICK} />
-              <YAxis domain={domain ?? ['auto', 'auto']} stroke="#94a3b8" tick={AXIS_TICK} width={40} />
+              <YAxis domain={['auto', 'auto']} stroke="#94a3b8" tick={AXIS_TICK} width={44} />
               <Tooltip contentStyle={TOOLTIP_STYLE} />
               <Legend wrapperStyle={{ fontSize: '13px' }} />
+              {limits.map((l) => (
+                <ReferenceLine key={l.label} y={l.value} stroke="#b91c1c" strokeDasharray="4 4" label={{ value: l.label, fontSize: 11, fill: '#b91c1c', position: 'insideTopRight' }} />
+              ))}
               {series.map((s) =>
                 kind === 'bar' ? (
                   <Bar key={s.key} dataKey={s.key} name={s.name} fill={s.color} radius={[4, 4, 0, 0]} />

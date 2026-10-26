@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
-// Exercises the real fetch client (the test env defaults to the mock API).
+// A signed-in Firebase user whose ID token the client should forward
+vi.mock('../lib/firebase', () => ({ firebaseAuth: { currentUser: { getIdToken: () => Promise.resolve('firebase-id-token') } } }));
+
 const loadClient = async () => {
-  vi.stubEnv('VITE_USE_MOCK', 'false');
-  vi.stubEnv('VITE_API_BASE_URL', 'https://api.example.test/api/v1/');
+  vi.stubEnv('VITE_AUTH_API_URL', 'https://auth.test/api/v1/');
+  vi.stubEnv('VITE_HEALTH_API_URL', 'https://health.test/api/v1');
+  vi.stubEnv('VITE_EXERCISE_API_URL', 'https://exercise.test/api/v1');
   vi.resetModules();
   return import('./api');
 };
@@ -24,60 +27,87 @@ describe('api client', () => {
     vi.unstubAllEnvs();
   });
 
-  it('sends cookies, JSON bodies and drops empty query params', async () => {
-    const { api } = await loadClient();
-    fetchMock.mockReturnValueOnce(jsonResponse(200, { ok: 1 }));
-    fetchMock.mockReturnValueOnce(jsonResponse(201, { success: true }));
-
-    await expect(api.get('/patients', { search: '', page: 2, type: undefined })).resolves.toEqual({ ok: 1 });
-    await api.post('/clinical-notes', { content: 'hi' });
-
-    const [getUrl, getInit] = fetchMock.mock.calls[0]!;
-    expect(getUrl).toBe('https://api.example.test/api/v1/patients?page=2');
-    expect(getInit.credentials).toBe('include');
-    expect(getInit.body).toBeUndefined();
-
-    const [, postInit] = fetchMock.mock.calls[1]!;
-    expect(postInit.method).toBe('POST');
-    expect(postInit.headers['Content-Type']).toBe('application/json');
-    expect(JSON.parse(postInit.body)).toEqual({ content: 'hi' });
+  it('sends each path to the API that owns it', async () => {
+    const { apiBaseFor } = await loadClient();
+    const routes: [string, string][] = [
+      ['/auth/me', 'https://auth.test/api/v1'],
+      ['/users/me/profile', 'https://auth.test/api/v1'],
+      ['/patients', 'https://auth.test/api/v1'],
+      ['/patients/abc', 'https://auth.test/api/v1'],
+      ['/patients/me/medical-profile', 'https://auth.test/api/v1'],
+      ['/patients/abc/medical-profile', 'https://auth.test/api/v1'],
+      ['/doctors/abc', 'https://auth.test/api/v1'],
+      ['/users/abc/invitations', 'https://auth.test/api/v1'],
+      ['/vital-types', 'https://health.test/api/v1'],
+      ['/me/vitals/today', 'https://health.test/api/v1'],
+      ['/doctor/alerts', 'https://health.test/api/v1'],
+      ['/doctor/patients/abc/vitals/trends', 'https://health.test/api/v1'],
+      ['/admin/alert-thresholds/PAIN', 'https://health.test/api/v1'],
+      ['/admin/vital-types/BP', 'https://health.test/api/v1'],
+      ['/exercise-categories', 'https://exercise.test/api/v1'],
+      ['/exercises/abc', 'https://exercise.test/api/v1'],
+      ['/exercise-completions/abc', 'https://exercise.test/api/v1'],
+      ['/patients/me/exercise-plan', 'https://exercise.test/api/v1'],
+      ['/patients/me/exercise-checklist', 'https://exercise.test/api/v1'],
+      ['/patients/me/exercise-completions', 'https://exercise.test/api/v1'],
+      ['/patients/abc/exercise-plan/versions', 'https://exercise.test/api/v1'],
+      ['/patients/abc/exercise-compliance', 'https://exercise.test/api/v1'],
+    ];
+    for (const [path, base] of routes) expect(apiBaseFor(path), path).toBe(base);
   });
 
-  it('surfaces the server message and per-field validation errors', async () => {
+  it('sends the Firebase token, JSON bodies, the idempotency key, and drops empty query params', async () => {
+    const { api } = await loadClient();
+    fetchMock.mockReturnValueOnce(jsonResponse(200, { data: [] }));
+    fetchMock.mockReturnValueOnce(jsonResponse(200, { date: '2026-10-26' }));
+
+    await api.get('/patients', { q: 'meera', cursor: '', limit: undefined });
+    await api.put('/me/vitals/today', { date: '2026-10-26', readings: {} }, 'key-1');
+
+    const [getUrl, getInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(getUrl).toBe('https://auth.test/api/v1/patients?q=meera');
+    expect((getInit.headers as Record<string, string>).Authorization).toBe('Bearer firebase-id-token');
+
+    const [putUrl, putInit] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(putUrl).toBe('https://health.test/api/v1/me/vitals/today');
+    expect(putInit.method).toBe('PUT');
+    expect(putInit.body).toBe(JSON.stringify({ date: '2026-10-26', readings: {} }));
+    expect(putInit.headers).toMatchObject({ 'Content-Type': 'application/json', 'Idempotency-Key': 'key-1' });
+  });
+
+  it('turns the API error shape into ApiError with code and per-field messages', async () => {
     const { api, ApiError } = await loadClient();
     fetchMock.mockReturnValueOnce(
-      jsonResponse(400, { success: false, message: 'Invalid input data', errors: [{ field: 'firstName', message: 'First name is required' }] })
+      jsonResponse(400, {
+        statusCode: 400,
+        code: 'VALIDATION_FAILED',
+        message: 'Validation failed',
+        requestId: 'r1',
+        details: [{ field: 'readings.PULSE.num', code: 'OUT_OF_RANGE', issue: 'must be between 30 and 220' }],
+      })
     );
 
-    const err = await api.post('/auth/register-patient', {}).catch((e: unknown) => e);
+    const err = await api.put('/me/vitals/today', {}).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ApiError);
-    expect(err).toMatchObject({ status: 400, message: 'Invalid input data', fieldErrors: { firstName: 'First name is required' } });
+    expect(err).toMatchObject({ status: 400, code: 'VALIDATION_FAILED', message: 'Validation failed' });
+    expect((err as InstanceType<typeof ApiError>).fieldErrors).toEqual({ 'readings.PULSE.num': 'must be between 30 and 220' });
   });
 
-  it('turns network failures into a readable ApiError with status 0', async () => {
-    const { api } = await loadClient();
-    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
-    await expect(api.get('/patients/me')).rejects.toMatchObject({ status: 0, message: expect.stringMatching(/unable to reach/i) });
-  });
-
-  it('reports 401s as an ended session, except wrong-credential responses from login', async () => {
+  it('reports a 401 as an ended session and network failures as status 0', async () => {
     const { api, onUnauthorized } = await loadClient();
-    const handler = vi.fn();
-    onUnauthorized(handler);
+    const ended = vi.fn();
+    onUnauthorized(ended);
+    fetchMock.mockReturnValueOnce(jsonResponse(401, { statusCode: 401, code: 'UNAUTHENTICATED', message: 'Sign in again' }));
+    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
 
-    fetchMock.mockReturnValueOnce(jsonResponse(401, { message: 'Invalid email or password.' }));
-    await expect(api.post('/auth/login', {})).rejects.toMatchObject({ status: 401 });
-    expect(handler).not.toHaveBeenCalled();
-
-    fetchMock.mockReturnValueOnce(jsonResponse(401, { message: 'Session has expired.' }));
-    await expect(api.get('/patients/me')).rejects.toMatchObject({ status: 401 });
-    expect(handler).toHaveBeenCalledTimes(1);
+    await expect(api.get('/auth/me')).rejects.toMatchObject({ status: 401, code: 'UNAUTHENTICATED' });
+    expect(ended).toHaveBeenCalledOnce();
+    await expect(api.get('/auth/me')).rejects.toMatchObject({ status: 0, code: 'NETWORK' });
   });
 
-  it('returns blobs for file downloads', async () => {
+  it('returns null for 204 responses', async () => {
     const { api } = await loadClient();
-    fetchMock.mockReturnValueOnce(Promise.resolve(new Response('a,b\n1,2', { status: 200 })));
-    const blob = await api.getBlob('/reports/me/csv');
-    expect(await blob.text()).toBe('a,b\n1,2');
+    fetchMock.mockReturnValueOnce(Promise.resolve(new Response(null, { status: 204 })));
+    await expect(api.delete('/exercise-completions/abc')).resolves.toBeNull();
   });
 });

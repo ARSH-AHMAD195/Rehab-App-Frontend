@@ -1,12 +1,10 @@
 /// <reference types="vitest" />
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import pkg from './package.json' with { type: 'json' };
 
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '');
-
+export default defineConfig(() => {
   return {
     plugins: [
       react(),
@@ -51,15 +49,8 @@ export default defineConfig(({ mode }) => {
     define: {
       'import.meta.env.VITE_APP_VERSION': JSON.stringify(pkg.version),
     },
-    server: {
-      port: 5173,
-      host: true,
-      strictPort: true,
-      // Same-origin /api in dev, so the backend's auth cookie behaves exactly as in production
-      proxy: {
-        '/api': { target: env.VITE_PROXY_TARGET || 'http://localhost:5000', changeOrigin: true },
-      },
-    },
+    // The live APIs only accept browser calls from origins on their CORS list, which includes localhost:5173
+    server: { port: 5173, host: true, strictPort: true },
     preview: { port: 4173, strictPort: true },
     build: {
       rollupOptions: {
@@ -79,7 +70,6 @@ export default defineConfig(({ mode }) => {
       // UI tests render lazily-loaded pages; cold chunk transforms are slow under jsdom
       testTimeout: 40_000,
       include: ['src/**/*.test.{ts,tsx,js}'],
-      env: { VITE_USE_MOCK: 'true' },
     },
   };
 });

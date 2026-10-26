@@ -14,13 +14,7 @@ export const ProtectedRoute = ({ children, allowedRoles }: { children: ReactNode
   if (!user) {
     return <Navigate to="/login" replace state={{ from: location.pathname, reason: endReason }} />;
   }
+  if (!allowedRoles.includes(user.role)) return <Navigate to={HOME_BY_ROLE[user.role] ?? '/'} replace />;
 
-  
-  const role = user.role.toLowerCase() as Role;
-
-  if (!allowedRoles.includes(role)) {
-    return <Navigate to={HOME_BY_ROLE[role] ?? '/'} replace />;
-  }
-  
   return children;
 };

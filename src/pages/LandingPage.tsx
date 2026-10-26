@@ -13,7 +13,7 @@ export const LandingPage = () => {
     },
     {
       q: 'How does remote doctor supervision work?',
-      a: 'Your hospital surgical team or prehabilitation specialist customizes an exercise regimen tailored to your upcoming surgery. As you complete exercises and log daily vitals, your doctor reviews adherence, vital signs trends, and clinical notes remotely.',
+      a: 'Your hospital surgical team or prehabilitation specialist customizes an exercise regimen tailored to your upcoming surgery. As you complete exercises and log daily vitals, your doctor reviews your adherence and vital sign trends remotely, and is alerted when a reading crosses a safe limit.',
     },
     {
       q: 'Can anyone register for an account?',
@@ -22,7 +22,7 @@ export const LandingPage = () => {
     {
       q: 'How is my private health data protected?',
       // Keep claims verifiable: legal/clinical review before changing this copy
-      a: 'Your data travels over encrypted connections. Role-based access controls mean only you and your assigned clinical team can see your records, and record views, exports and clinical changes are written to an audit log.',
+      a: 'Your data travels over encrypted connections. Role-based access controls mean only you and your assigned clinical team can see your records, and record views and clinical changes are written to an audit log.',
     },
     {
       q: 'Does this platform replace my doctor?',
@@ -253,7 +253,7 @@ export const LandingPage = () => {
               </div>
               <h3 className="font-bold text-base text-slate-900">Clinician Oversight</h3>
               <p className="text-xs text-slate-600 mt-2 leading-relaxed">
-                Your assigned doctor reviews compliance trends, adjusts repetitions, and schedules clinical follow-ups.
+                Your assigned doctor reviews compliance trends, adjusts your exercise plan, and is alerted to out-of-range readings.
               </p>
             </div>
           </div>

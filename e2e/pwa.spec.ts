@@ -1,5 +1,4 @@
 import { expect, test } from '@playwright/test';
-import { ACCOUNTS, signIn } from './helpers';
 
 test('serves a valid, installable web app manifest', async ({ page, request }) => {
   await page.goto('/');
@@ -41,7 +40,12 @@ test('installs a service worker and opens offline', async ({ page, context }) =>
 });
 
 test('never caches API responses in the service worker', async ({ page }) => {
-  await signIn(page, ACCOUNTS.patient);
+  await page.goto('/');
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
   const cachedUrls = await page.evaluate(async () => {
     const urls: string[] = [];
     for (const name of await caches.keys()) {
@@ -50,5 +54,5 @@ test('never caches API responses in the service worker', async ({ page }) => {
     return urls;
   });
   expect(cachedUrls.length).toBeGreaterThan(0);
-  expect(cachedUrls.filter((u) => u.includes('/api/'))).toEqual([]);
+  expect(cachedUrls.filter((u) => u.includes('/api/v1'))).toEqual([]);
 });

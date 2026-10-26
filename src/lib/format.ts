@@ -1,4 +1,4 @@
-import type { HealthMeasurement, Medication, UserSummary } from '../types/api';
+import type { ReadingValue, Target } from '../types/api';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -6,13 +6,15 @@ type DateInput = string | number | Date | null | undefined;
 
 const toDate = (value: DateInput): Date | null => {
   if (value === null || value === undefined || value === '') return null;
-  const d = new Date(value);
+  // A bare YYYY-MM-DD is a calendar day, not UTC midnight
+  const d = typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? fromDateKey(value) : new Date(value);
   return Number.isNaN(d.getTime()) ? null : d;
 };
 
-/** "pelvic_floor" -> "Pelvic Floor" (all underscores, not just the first). */
+/** "pelvic_floor" / "PELVIC_FLOOR" -> "Pelvic Floor" (all underscores, not just the first). */
 export const labelize = (value: string | null | undefined = '') =>
   String(value ?? '')
+    .toLowerCase()
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase());
 
@@ -43,30 +45,37 @@ export const localDateKey = (value: DateInput = new Date()) => {
 };
 
 /** Parses a YYYY-MM-DD key as a local date (new Date('2026-01-05') would be UTC midnight). */
-export const fromDateKey = (key: string) => {
+export function fromDateKey(key: string) {
   const [y = 1970, m = 1, d = 1] = key.split('-').map(Number);
   return new Date(y, m - 1, d);
+}
+
+/** The value of a vital reading as text: "128/82", "76", or the nutrition note. */
+export const formatReading = (value: ReadingValue | null | undefined) => {
+  if (!value) return '—';
+  if ('systolic' in value) return `${value.systolic}/${value.diastolic}`;
+  return 'num' in value ? String(value.num) : value.text;
 };
 
-/**
- * Date-only input value -> ISO timestamp at local noon. Sending "2026-01-05" raw makes the
- * server store UTC midnight, which renders as Jan 4 anywhere west of UTC.
- */
-export const dateInputToIso = (key: string) => {
-  const d = fromDateKey(key);
-  d.setHours(12);
-  return d.toISOString();
-};
+/** An exercise target as text: "2 × 10 · 15 min". */
+export const describeTarget = (target: Target | null | undefined) =>
+  [target?.sets && target.reps ? `${target.sets} × ${target.reps}` : target?.reps ? `${target.reps} reps` : null, target?.durationMin ? `${target.durationMin} min` : null]
+    .filter(Boolean)
+    .join(' · ');
 
-export const formatMeasurementValue = (m: Pick<HealthMeasurement, 'type' | 'systolic' | 'diastolic' | 'numericValue' | 'textValue'> | undefined) => {
-  if (!m) return '—';
-  if (m.type === 'blood_pressure') return `${m.systolic}/${m.diastolic}`;
-  return m.numericValue ?? m.textValue ?? '—';
-};
+/** "Meera Nair" -> "MN" */
+export const initials = (name: string | null | undefined) =>
+  (name ?? '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase();
 
-export const fullName = (user: Partial<UserSummary> | null | undefined) => [user?.firstName, user?.lastName].filter(Boolean).join(' ');
-
-export const initials = (user: Partial<UserSummary> | null | undefined) => `${user?.firstName?.[0] ?? ''}${user?.lastName?.[0] ?? ''}`.toUpperCase();
-
-export const formatMedication = (med: Medication | string) =>
-  typeof med === 'string' ? med : [med.name, med.dosage, med.frequency].filter(Boolean).join(' ');
+/** Splits a comma-separated input into trimmed, non-empty items. */
+export const splitList = (text: string, separator: string | RegExp = ',') =>
+  text
+    .split(separator)
+    .map((s) => s.trim())
+    .filter(Boolean);

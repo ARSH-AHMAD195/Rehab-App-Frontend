@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Activity, Dumbbell, FileText, Heart, LogOut, Menu, Shield, Stethoscope, UserCircle, UserPlus, Users, X, type LucideIcon } from 'lucide-react';
+import { Activity, Dumbbell, Heart, LogOut, Stethoscope, UserCircle, UserPlus, Users, type LucideIcon } from 'lucide-react';
 import { useSignedInUser, useAuth } from '../context/AuthContext';
-import { NotificationDropdown } from '../components/common/NotificationDropdown';
 import { MedicalDisclaimer } from '../components/common/MedicalDisclaimer';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { IdleLogout } from '../components/IdleLogout';
@@ -18,20 +17,18 @@ const NAV: Record<Role, NavItem[]> = {
     { label: 'Today', to: '/patient/dashboard', icon: Activity },
     { label: 'My Exercises', short: 'Exercises', to: '/patient/exercises', icon: Dumbbell },
     { label: 'Health Tracker', short: 'Vitals', to: '/patient/health-tracker', icon: Heart },
-    { label: 'Progress Report', short: 'Report', to: '/patient/report', icon: FileText },
     { label: 'My Profile', short: 'Me', to: '/patient/profile', icon: UserCircle },
   ],
   doctor: [
-    { label: 'Clinical Dashboard', to: '/doctor/dashboard', icon: Activity },
-    { label: 'Assigned Patients', to: '/doctor/patients', icon: Users },
-    { label: 'Onboard Patient', to: '/doctor/onboard-patient', icon: UserPlus },
-    { label: 'Exercise Catalog', to: '/doctor/exercises', icon: Dumbbell },
+    { label: 'Clinical Dashboard', short: 'Dashboard', to: '/doctor/dashboard', icon: Activity },
+    { label: 'Assigned Patients', short: 'Patients', to: '/doctor/patients', icon: Users },
+    { label: 'Onboard Patient', short: 'Onboard', to: '/doctor/onboard-patient', icon: UserPlus },
+    { label: 'Exercise Catalog', short: 'Exercises', to: '/doctor/exercises', icon: Dumbbell },
   ],
   admin: [
-    { label: 'System Overview', to: '/admin/dashboard', icon: Activity },
-    { label: 'Exercise Library', to: '/admin/exercises', icon: Dumbbell },
-    { label: 'Doctor Accounts', to: '/admin/doctors', icon: Stethoscope },
-    { label: 'Compliance Audit Logs', to: '/admin/audit-logs', icon: Shield },
+    { label: 'System Overview', short: 'Overview', to: '/admin/dashboard', icon: Activity },
+    { label: 'Exercise Library', short: 'Exercises', to: '/admin/exercises', icon: Dumbbell },
+    { label: 'Doctor Accounts', short: 'Doctors', to: '/admin/doctors', icon: Stethoscope },
   ],
 };
 
@@ -41,13 +38,13 @@ const ROLE_BADGE: Record<Role, string> = {
   admin: 'bg-indigo-50 text-indigo-800 border-indigo-200',
 };
 
-/** Patients on phones: app-style bottom tabs instead of a hidden menu (lg+ uses the sidebar). */
+/** Phones and tablets: app-style bottom tabs instead of a hidden menu (lg+ uses the sidebar). */
 const BottomTabs = ({ items }: { items: NavItem[] }) => (
   <nav
     aria-label="Main"
-    className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden print:hidden"
+    className="fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-lg rounded-2xl border border-slate-200 bg-white/95 shadow-lg backdrop-blur-md lg:hidden print:hidden"
   >
-    <ul className="mx-auto flex max-w-lg">
+    <ul className="flex">
       {items.map(({ label, short, to, icon: Icon }) => (
         <li key={to} className="flex-1">
           <NavLink
@@ -74,40 +71,28 @@ const BottomTabs = ({ items }: { items: NavItem[] }) => (
   </nav>
 );
 
-
-const NavItems = ({
-    items = [],
-    onNavigate,
-  }: {
-    items?: NavItem[];
-    onNavigate?: () => void;
-  }) =>
-    items.map(({ label, to, icon: Icon }) => (
-      <NavLink
-        key={to}
-        to={to}
-        onClick={onNavigate}
-        className={({ isActive }) =>
-          cn(
-            'flex min-h-11 items-center gap-3 rounded-xl px-3.5 py-2.5 text-base font-medium transition-colors',
-            isActive
-              ? 'bg-teal-50 font-semibold text-teal-900'
-              : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-          )
-        }
-      >
-        <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
-        <span>{label}</span>
-      </NavLink>
-    ));
-
+const NavItems = ({ items }: { items: NavItem[] }) =>
+  items.map(({ label, to, icon: Icon }) => (
+    <NavLink
+      key={to}
+      to={to}
+      className={({ isActive }) =>
+        cn(
+          'flex min-h-11 items-center gap-3 rounded-xl px-3.5 py-2.5 text-base font-medium transition-colors',
+          isActive ? 'bg-teal-50 font-semibold text-teal-900' : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+        )
+      }
+    >
+      <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+      <span>{label}</span>
+    </NavLink>
+  ));
 
 export const DashboardLayout = () => {
   const user = useSignedInUser();
   const { logout } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
   const firstRender = useRef(true);
 
@@ -120,17 +105,8 @@ export const DashboardLayout = () => {
     mainRef.current?.focus();
   }, [pathname]);
 
-  
-  const role = user.role.toLowerCase() as Role;
-
+  const role = user.role;
   const navItems = NAV[role];
-  const useBottomTabs = role === 'patient';
-
-  const displayName =
-    role === 'doctor'
-      ? `Dr. ${user.lastName}`
-      : `${user.firstName} ${user.lastName}`;
-
 
   const handleLogout = async () => {
     await logout();
@@ -167,9 +143,9 @@ export const DashboardLayout = () => {
 
         <div className="mx-3 my-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-teal-700 font-bold text-white">{initials(user)}</div>
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-teal-700 font-bold text-white">{initials(user.name)}</div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-base font-semibold text-slate-900">{displayName}</p>
+              <p className="truncate text-base font-semibold text-slate-900">{user.name}</p>
               <span
                 className={cn(
                   'inline-block rounded-full border px-2 py-0.5 text-xs font-bold uppercase tracking-wide',
@@ -195,48 +171,22 @@ export const DashboardLayout = () => {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white/95 px-4 py-2.5 pt-[max(0.625rem,env(safe-area-inset-top))] backdrop-blur-md sm:px-6 print:hidden">
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setMobileMenuOpen((open) => !open)}
-              className={cn('rounded-xl p-2.5 text-slate-700 hover:bg-slate-100 lg:hidden', useBottomTabs && 'hidden')}
-              aria-label={mobileMenuOpen ? 'Close navigation' : 'Open navigation'}
-              aria-expanded={mobileMenuOpen}
-              aria-controls="mobile-nav"
-            >
-              {mobileMenuOpen ? <X className="h-6 w-6" aria-hidden="true" /> : <Menu className="h-6 w-6" aria-hidden="true" />}
-            </button>
             <span className="text-base font-bold text-slate-900 lg:hidden">Fit for Surgery</span>
-            <p className="hidden text-base font-semibold text-slate-800 lg:block">Welcome back, {user.firstName}</p>
+            <p className="hidden text-base font-semibold text-slate-800 lg:block">Welcome back, {user.name.split(' ')[0]}</p>
           </div>
 
           <div className="flex items-center gap-2">
-            <NotificationDropdown />
-            <div className="hidden h-6 w-px bg-slate-200 sm:block" />
-            {logoutButton('hidden px-3 sm:flex')}
+            <InstallButton className="lg:hidden" />
+            {logoutButton('px-3')}
           </div>
         </header>
-
-        {mobileMenuOpen && !useBottomTabs && (
-          <nav id="mobile-nav" aria-label="Main" className="space-y-1 border-b border-slate-200 bg-white p-4 lg:hidden print:hidden">
-            <div className="mb-2 border-b border-slate-100 pb-3">
-              <p className="text-base font-semibold text-slate-900">{displayName}</p>
-              <span className="text-sm font-medium uppercase text-teal-800">{user.role}</span>
-            </div>
-            <NavItems items={navItems} onNavigate={() => setMobileMenuOpen(false)} />
-            <InstallButton className="mt-2 w-full" />
-            {logoutButton('mt-2 w-full px-3 py-2 text-rose-700')}
-          </nav>
-        )}
 
         <main
           id="main"
           ref={mainRef}
           tabIndex={-1}
-          className={cn(
-            'mx-auto w-full max-w-7xl flex-1 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] focus:outline-none sm:p-6 lg:p-8 print:p-0',
-            // Room for the bottom tab bar (and the floating action button above it)
-            useBottomTabs && 'pb-[calc(9rem+env(safe-area-inset-bottom))] lg:pb-8'
-          )}
+          // Bottom padding leaves room for the floating navbar (and the floating action button above it)
+          className="mx-auto w-full max-w-7xl flex-1 p-4 pb-[calc(10rem+env(safe-area-inset-bottom))] focus:outline-none sm:p-6 sm:pb-[calc(10rem+env(safe-area-inset-bottom))] lg:p-8 print:p-0"
         >
           <div className="print:hidden">
             <MedicalDisclaimer />
@@ -248,7 +198,7 @@ export const DashboardLayout = () => {
         </main>
       </div>
 
-      {useBottomTabs && <BottomTabs items={navItems} />}
+      <BottomTabs items={navItems} />
       <IdleLogout />
     </div>
   );

@@ -37,7 +37,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
     <ToastContext.Provider value={toast}>
       {children}
       <div
-        // Clears the patient bottom tab bar on phones
+        // Clears the floating bottom navbar on phones and tablets
         className="pointer-events-none fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-[60] w-[calc(100%-2rem)] space-y-2 sm:w-96 lg:bottom-4"
         aria-live="polite"
       >

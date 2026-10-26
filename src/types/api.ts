@@ -1,296 +1,289 @@
-// Shapes returned by the Fit for Surgery REST API (backend/models + backend/controllers).
-// Dates arrive as ISO strings. Populated references are typed as the populated object.
+// Shapes returned by the three Fit for Surgery APIs (Auth, Health Monitoring, Exercise).
+// Times are ISO strings with the patient's offset; dates are YYYY-MM-DD in the patient's time zone.
 
 export type Id = string;
 export type IsoDate = string;
+/** Lower-cased on arrival (the API sends PATIENT / DOCTOR / ADMIN). */
 export type Role = 'patient' | 'doctor' | 'admin';
 
+/** Every list endpoint pages with an opaque cursor. */
+export interface Page<T> {
+  data: T[];
+  nextCursor: string | null;
+}
+
+export interface Ref {
+  id: Id;
+  name: string;
+}
+
+// ---------- Auth API ----------
+
+/** GET /auth/me */
 export interface User {
-  _id: Id;
-  email: string;
+  id: Id;
   role: Role;
-  firstName: string;
-  lastName: string;
+  name: string;
+  email: string | null;
+  emailVerified: boolean;
+  active: boolean;
+}
+
+/** GET /users/me/profile */
+export interface Profile {
+  id: Id;
+  role: Role;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  timeZone?: string | null;
+  doctors?: Ref[];
+  specialization?: string | null;
+  createdAt: IsoDate | null;
+  updatedAt: IsoDate | null;
+}
+
+export interface Patient {
+  id: Id;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  timeZone: string | null;
+  active: boolean;
+  emailVerified: boolean;
+  doctors: Ref[];
+  createdAt: IsoDate | null;
+}
+
+export interface Doctor {
+  id: Id;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  specialization: string | null;
+  active: boolean;
+  emailVerified: boolean;
+  patientCount: number;
+  createdAt: IsoDate | null;
+}
+
+export type InvitationStatus = 'SENT' | 'FAILED';
+
+export const SEXES = ['MALE', 'FEMALE', 'OTHER', 'UNDISCLOSED'] as const;
+export const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'UNKNOWN'] as const;
+export const SMOKING_STATUSES = ['NEVER', 'FORMER', 'CURRENT'] as const;
+
+export interface EmergencyContact {
+  name: string;
+  relation: string;
   phone: string;
-  isActive: boolean;
-  lastLogin: IsoDate | null;
+}
+
+export interface MedicalFields {
+  dateOfBirth: string | null;
+  sex: (typeof SEXES)[number] | null;
+  heightCm: number | null;
+  bloodGroup: (typeof BLOOD_GROUPS)[number] | null;
+  diagnosis: string | null;
+  plannedSurgery: string | null;
+  plannedSurgeryDate: string | null;
+  comorbidities: string[] | null;
+  allergies: string[] | null;
+  medications: string[] | null;
+  smokingStatus: (typeof SMOKING_STATUSES)[number] | null;
+  emergencyContact: EmergencyContact | null;
+}
+
+/** GET .../medical-profile. `version` is 0 until something is saved. */
+export interface MedicalProfile extends MedicalFields {
+  patientId: Id;
+  version: number;
+  updatedAt: IsoDate | null;
+  updatedBy: { id: Id; role: string } | null;
+}
+
+// ---------- Health Monitoring API ----------
+
+export type VitalType = 'BP' | 'PULSE' | 'SPO2' | 'TEMP' | 'WEIGHT' | 'SUGAR' | 'PAIN' | 'WALK_MIN' | 'STEPS' | 'SLEEP_HRS' | 'NUTRITION' | 'WATER_ML' | 'MOOD';
+
+export interface VitalTypeDef {
+  type: VitalType;
+  label: string;
+  unit: string | null;
+  valueKind: 'numeric' | 'pair' | 'scale' | 'text';
+  minValid?: number;
+  maxValid?: number;
+  /** BP only */
+  fields?: Record<'systolic' | 'diastolic', { minValid: number; maxValid: number }>;
+  isOptional: boolean;
+  onForm: boolean;
+  version: number;
+  integerOnly?: boolean;
+  step?: number;
+}
+
+/** `{ num }`, `{ systolic, diastolic }` (BP) or `{ text }` (NUTRITION). */
+export type ReadingValue = { num: number } | { systolic: number; diastolic: number } | { text: string };
+
+export interface Reading {
+  value: ReadingValue | null;
+  unit: string | null;
+  status: 'LOGGED' | 'NOT_YET';
+  loggedAt: IsoDate | null;
+  label?: string | null;
+}
+
+export interface DailyLog {
+  date: string;
+  timeZone: string;
+  dayStatus: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETE';
+  filledCount: number;
+  totalCount: number;
+  readings: Record<VitalType, Reading>;
+}
+
+export type AlertSeverity = 'LOW' | 'MEDIUM' | 'HIGH';
+
+export interface SavedAlert {
+  id: Id;
+  type: VitalType;
+  field: string | null;
+  rule: 'BELOW_LOW' | 'ABOVE_HIGH';
+  threshold: number;
+  severity: AlertSeverity;
+  status: 'OPEN' | 'ACKNOWLEDGED';
+}
+
+export interface VitalAlert extends SavedAlert {
+  patient: Ref;
+  date: string;
+  value: Record<string, unknown>;
+  currentValue: Record<string, unknown> | null;
+  createdAt: IsoDate;
+  acknowledgedAt: IsoDate | null;
+  note: string | null;
+}
+
+export type TrendPeriod = '7d' | '30d' | '90d';
+
+export interface ThresholdPair {
+  low: number | null;
+  high: number | null;
+}
+
+export interface Trend {
+  type: VitalType;
+  unit: string | null;
+  period: TrendPeriod;
+  labels: string[];
+  values?: (number | null)[];
+  systolic?: (number | null)[];
+  diastolic?: (number | null)[];
+  thresholds: ThresholdPair | Record<string, ThresholdPair | null> | null;
+}
+
+// ---------- Exercise API ----------
+
+export interface Category {
+  id: Id;
+  code: string;
+  name: string;
+  order: number;
+  active: boolean;
+}
+
+export interface Video {
+  provider: 'YOUTUBE';
+  videoId: string;
+  url: string;
+}
+
+export interface Exercise {
+  id: Id;
+  name: string;
+  categoryId: Id;
+  /** Category code, e.g. STRENGTH */
+  category: string;
+  description: string | null;
+  instructions: string[];
+  video: Video | null;
+  active: boolean;
   createdAt: IsoDate;
   updatedAt: IsoDate;
 }
 
-export type UserSummary = Pick<User, '_id' | 'firstName' | 'lastName'> & Partial<Pick<User, 'email' | 'phone'>>;
+export type PlanExercise = Pick<Exercise, 'id' | 'name' | 'category' | 'description' | 'instructions' | 'video' | 'active'>;
 
-export interface EmergencyContact {
-  name: string;
-  relationship: string;
-  phone: string;
+export interface Target {
+  sets: number | null;
+  reps: number | null;
+  durationMin: number | null;
 }
 
-export interface Medication {
-  name: string;
-  dosage: string;
-  frequency: string;
+export interface PlanItem {
+  itemId: string;
+  exercise: PlanExercise;
+  /** 1 = Monday … 7 = Sunday */
+  schedule: { daysOfWeek: number[]; timesPerDay: number };
+  target: Target | null;
+  notes: string | null;
 }
 
-export interface PatientProfile {
-  _id: Id;
-  user: Id;
-  dateOfBirth: IsoDate;
-  gender: 'male' | 'female' | 'other';
-  surgeryType: string;
-  surgeryDate: IsoDate;
-  hospitalNumber: string;
-  assignedDoctor: UserSummary | null;
-  emergencyContact: EmergencyContact;
-  targetWeeklyExerciseMinutes: number;
-  heightCm: number | null;
-  weightKg: number | null;
-  bmi: number | null;
-  allergies: string[];
-  currentMedications: (Medication | string)[];
-  baselineMobility: string;
-  smokingStatus: string;
-  alcoholIntake: string;
-  medicalConditions: string[];
-  clinicalNotesSummary: string;
-}
-
-export interface DoctorProfile {
-  _id: Id;
-  user: Id;
-  specialization: string;
-  department: string;
-  licenseNumber: string;
-  hospitalAffiliation: string;
-  consultationHours: string;
-}
-
-export type ExerciseCategory = 'walking' | 'strength' | 'breathing' | 'stretching' | 'cardio' | 'mobility' | 'pelvic_floor' | 'other';
-
-export interface Exercise {
-  _id: Id;
-  title: string;
-  description: string;
-  category: ExerciseCategory;
-  instructions: string[];
-  videoUrl: string;
-  defaultDurationMinutes: number;
-  defaultReps: number;
-  defaultSets: number;
-  defaultFrequency: string;
-  contraindications: string[];
-  safetyNotes: string;
-  isActive: boolean;
-}
-
-export interface ExerciseAssignment {
-  _id: Id;
-  patient: Id;
-  doctor: UserSummary | null;
-  exercise: Exercise | null;
-  startDate: IsoDate;
-  endDate: IsoDate | null;
-  frequency: string;
-  customizedDurationMinutes: number;
-  customizedReps: number;
-  customizedSets: number;
-  customizedInstructions: string;
-  status: 'active' | 'paused' | 'completed';
-  createdAt: IsoDate;
-  completedToday?: boolean;
-}
-
-export interface ExerciseSession {
-  _id: Id;
-  assignment: Id;
-  exercise: Exercise | null;
-  patient: Id;
-  completedAt: IsoDate;
-  status: 'completed' | 'partial' | 'skipped';
-  durationMinutes: number;
-  repetitionsCompleted: number;
-  setsCompleted: number;
-  perceivedExertion: number;
-  patientFeedback: string;
-}
-
-export type MeasurementType =
-  | 'blood_pressure'
-  | 'pulse'
-  | 'spo2'
-  | 'temperature'
-  | 'weight'
-  | 'blood_sugar'
-  | 'pain_score'
-  | 'walking_minutes'
-  | 'step_count'
-  | 'sleep_hours'
-  | 'water_intake'
-  | 'mood'
-  | 'nutrition_intake';
-
-export interface HealthMeasurement {
-  _id: Id;
-  patient: Id;
-  type: MeasurementType;
-  systolic?: number;
-  diastolic?: number;
-  numericValue?: number;
-  textValue?: string;
-  unit: string;
-  measuredAt: IsoDate;
-  notes: string;
-}
-
-export type NoteType = 'preop_assessment' | 'progress_review' | 'exercise_adjustment' | 'general_consultation';
-
-export interface ClinicalNote {
-  _id: Id;
-  patient: Id;
-  doctor: UserSummary | null;
-  noteType: NoteType;
-  content: string;
-  followUpInstructions: string;
-  isConfidential: boolean;
-  createdAt: IsoDate;
-}
-
-export type FollowUpStatus = 'scheduled' | 'completed' | 'cancelled';
-
-export interface FollowUp {
-  _id: Id;
-  patient: Id | UserSummary;
-  doctor: UserSummary | Id | null;
-  scheduledDate: IsoDate;
-  reason: string;
-  status: FollowUpStatus;
-  notes: string;
-}
-
-export interface AppNotification {
-  _id: Id;
-  title: string;
-  message: string;
-  type: 'exercise_assigned' | 'reminder' | 'measurement_due' | 'clinical_note' | 'system';
-  isRead: boolean;
-  link: string;
-  createdAt: IsoDate;
-}
-
-export interface TimelineItem {
-  id: string;
-  type: 'exercise' | 'measurement' | 'clinical_note' | 'follow_up' | 'prescription';
-  timestamp: IsoDate;
-  title: string;
-  description: string;
-  badge?: string;
-}
-
-export type AlertSeverity = 'critical' | 'high' | 'medium' | 'info';
-
-export interface PatientAlert {
-  id: string;
+/** `version` 0 = no plan yet. */
+export interface Plan {
   patientId: Id;
-  patientName: string;
-  type: 'vital_critical' | 'vital_warning' | 'upcoming_surgery' | 'inactivity';
-  severity: AlertSeverity;
+  version: number;
+  items: PlanItem[];
+  assignedBy: Ref | null;
+  updatedAt: IsoDate | null;
+}
+
+export interface ChecklistItem {
+  itemId: string;
+  exercise: PlanExercise;
+  timesPerDay: number;
+  doneCount: number;
+  status: 'NOT_YET' | 'PARTLY_DONE' | 'DONE';
+  completions: { id: Id; completedAt: IsoDate }[];
+  target: Target | null;
+  notes: string | null;
+}
+
+export interface Checklist {
+  date: string;
+  planVersion: number;
+  items: ChecklistItem[];
+  doneCount: number;
+  plannedCount: number;
+}
+
+export interface Completion {
+  id: Id;
+  itemId: string;
+  exercise: { id: Id; name: string; category: string };
+  planVersion: number;
+  date: string;
+  completedAt: IsoDate;
+  details: { durationMin?: number | null; note?: string | null } | null;
+}
+
+export interface Compliance {
+  from: string;
+  to: string;
+  planned: number;
+  done: number;
+  percentage: number | null;
+  byDay: { date: string; planned: number; done: number }[];
+  byExercise: { itemId: string; exerciseId: Id; name: string; planned: number; done: number }[];
+}
+
+// ---------- Errors ----------
+
+/** Every API error: `{ statusCode, code, message, requestId, details? }`. */
+export interface ErrorBody {
+  statusCode: number;
+  code: string;
   message: string;
-  timestamp: IsoDate;
-  value: string;
-}
-
-export interface AuditLog {
-  _id: Id;
-  userEmail: string;
-  role: string;
-  action: string;
-  targetResource: string;
-  targetId: string;
-  details: Record<string, unknown>;
-  timestamp: IsoDate;
-}
-
-// ---------- Response envelopes ----------
-
-export interface Ok {
-  success: true;
-  message?: string;
-}
-
-export interface Paginated {
-  total: number;
-  page: number;
-  totalPages: number;
-}
-
-export interface PatientListItem {
-  user: User;
-  profile: PatientProfile | null;
-}
-
-export interface MyProfileResponse extends Ok {
-  user: User;
-  profile: PatientProfile;
-  daysUntilSurgery: number;
-  isPreOp: boolean;
-}
-
-export interface PatientChartResponse extends Ok {
-  patient: User;
-  profile: PatientProfile | null;
-  activeAssignments: ExerciseAssignment[];
-  adherence: { totalActiveExercises: number; completedSessionsLast7Days: number };
-  recentMeasurements: HealthMeasurement[];
-}
-
-export interface ReportSummary {
-  totalExercisesAssigned?: number;
-  totalSessionsLogged?: number;
-  completedSessionsCount: number;
-  totalMinutesLogged: number;
-  totalMeasurementsRecorded?: number;
-  totalMeasurements?: number;
-  adherenceRate?: number;
-}
-
-export interface FullReport {
-  generatedAt: IsoDate;
-  patient: { id: Id; name: string; email: string; phone?: string };
-  profile: PatientProfile | null;
-  summary: ReportSummary;
-  recentMeasurements: HealthMeasurement[];
-  recentSessions: ExerciseSession[];
-  assignments: ExerciseAssignment[];
-}
-
-export interface PeriodReport extends Ok {
-  reportType: 'weekly' | 'monthly';
-  period: string;
-  patient: { id: Id; name: string; email: string };
-  profile: PatientProfile | null;
-  summary: ReportSummary;
-  sessions: ExerciseSession[];
-  measurements: HealthMeasurement[];
-}
-
-export interface ConsentStatusResponse extends Ok {
-  consentStatus: Record<string, boolean>;
-  isFullyConsented: boolean;
-}
-
-export interface Analytics {
-  totalPatients: number;
-  totalDoctors: number;
-  totalActiveExercises: number;
-  totalSessions: number;
-  totalMeasurements: number;
-  sessionsLast7Days: number;
-  measurementsLast7Days: number;
-}
-
-/** Body of a 400 from the backend's zod `validate` middleware. */
-export interface ValidationErrorBody {
-  success: false;
-  message: string;
-  errors?: { field: string; message: string }[];
+  requestId?: string;
+  details?: { field: string; code: string; issue: string }[];
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { createBrowserRouter, Navigate, Outlet, RouterProvider, ScrollRestoration, useNavigation, type RouteObject } from 'react-router-dom';
+import { createBrowserRouter, Navigate, Outlet, redirect, RouterProvider, ScrollRestoration, useNavigation, type RouteObject } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './components/ui/toast';
@@ -9,7 +9,6 @@ import { ProtectedRoute } from './routes/ProtectedRoute';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import { OfflineBanner, PwaPrompts } from './components/pwa/PwaPrompts';
 import { queryClient } from './lib/queryClient';
-import { USE_MOCK } from './services/api';
 import type { Role } from './types/api';
 
 // Each page is its own chunk: patients never download admin screens or charting code they don't use.
@@ -32,11 +31,6 @@ const RootLayout = () => {
   const navigation = useNavigation();
   return (
     <>
-      {USE_MOCK && (
-        <p className="bg-amber-100 px-4 py-1 text-center text-xs font-semibold text-amber-950 print:hidden">
-          Demo mode: mock API, data is stored in this browser only. Not for real patient data.
-        </p>
-      )}
       <OfflineBanner />
       {navigation.state === 'loading' && (
         <div className="fixed inset-x-0 top-0 z-[70] h-1 animate-pulse bg-teal-600" role="progressbar" aria-label="Loading page" />
@@ -54,14 +48,14 @@ const routes: RouteObject[] = [
     errorElement: <RouteError />,
     hydrateFallbackElement: <PageLoader />,
     children: [
-      { path: '/', ...page(() => import('./pages/LandingPage'), 'LandingPage') },
+      // Phones skip the marketing page and go straight to sign-in (which sends signed-in users home)
+      { path: '/', loader: () => (window.matchMedia?.('(max-width: 767px)').matches ? redirect('/login') : null), ...page(() => import('./pages/LandingPage'), 'LandingPage') },
       { path: '/login', ...page(() => import('./pages/LoginPage'), 'LoginPage') },
       { path: '/forgot-password', ...page(() => import('./pages/ForgotPasswordPage'), 'ForgotPasswordPage') },
       roleArea('patient', [
         { path: 'dashboard', ...page(() => import('./pages/patient/PatientDashboard'), 'PatientDashboard') },
         { path: 'exercises', ...page(() => import('./pages/patient/PatientExercisesPage'), 'PatientExercisesPage') },
         { path: 'health-tracker', ...page(() => import('./pages/patient/PatientHealthTrackerPage'), 'PatientHealthTrackerPage') },
-        { path: 'report', ...page(() => import('./pages/patient/PatientReportPage'), 'PatientReportPage') },
         { path: 'profile', ...page(() => import('./pages/patient/PatientProfilePage'), 'PatientProfilePage') },
       ]),
       roleArea('doctor', [
@@ -75,7 +69,6 @@ const routes: RouteObject[] = [
         { path: 'dashboard', ...page(() => import('./pages/admin/AdminDashboard'), 'AdminDashboard') },
         { path: 'doctors', ...page(() => import('./pages/admin/AdminDoctorsPage'), 'AdminDoctorsPage') },
         { path: 'exercises', ...page(() => import('./pages/admin/AdminExercisesPage'), 'AdminExercisesPage') },
-        { path: 'audit-logs', ...page(() => import('./pages/admin/AdminAuditLogsPage'), 'AdminAuditLogsPage') },
       ]),
       { path: '*', element: <Navigate to="/" replace /> },
     ],

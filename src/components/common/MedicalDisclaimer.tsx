@@ -1,6 +1,6 @@
 import { ChevronDown, ShieldAlert } from 'lucide-react';
 
-/** One line by default (the full text is also part of consent); expands on demand. */
+/** One line by default; expands on demand. */
 export const MedicalDisclaimer = () => (
   <details className="group mb-4 rounded-xl border border-teal-200 bg-teal-50 text-sm text-slate-800">
     <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3.5 py-2 [&::-webkit-details-marker]:hidden">

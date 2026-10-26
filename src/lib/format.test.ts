@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { dateInputToIso, daysUntil, formatMeasurementValue, formatMedication, fromDateKey, labelize, localDateKey } from './format';
+import { daysUntil, formatReading, fromDateKey, initials, labelize, localDateKey, splitList } from './format';
 
 describe('format helpers', () => {
-  it('labelize replaces every underscore', () => {
+  it('labelize handles API codes and snake case', () => {
     expect(labelize('general_consultation_note')).toBe('General Consultation Note');
+    expect(labelize('PELVIC_FLOOR')).toBe('Pelvic Floor');
     expect(labelize(undefined)).toBe('');
   });
 
@@ -12,6 +13,7 @@ describe('format helpers', () => {
     expect(daysUntil(new Date(2026, 4, 11, 0, 15), now)).toBe(1);
     expect(daysUntil(new Date(2026, 4, 10, 8), now)).toBe(0);
     expect(daysUntil(new Date(2026, 4, 1), now)).toBe(-9);
+    expect(daysUntil('2026-05-12', now)).toBe(2);
     expect(daysUntil(null, now)).toBeNull();
     expect(daysUntil('not a date', now)).toBeNull();
   });
@@ -19,17 +21,16 @@ describe('format helpers', () => {
   it('local date keys round-trip without drifting to the UTC day', () => {
     expect(localDateKey(new Date(2026, 0, 5, 23, 59))).toBe('2026-01-05');
     expect(localDateKey(fromDateKey('2026-01-05'))).toBe('2026-01-05');
+    expect(localDateKey('2026-01-05')).toBe('2026-01-05');
   });
 
-  it('date inputs are sent as local noon so the calendar day survives timezones', () => {
-    expect(localDateKey(new Date(dateInputToIso('2026-03-29')))).toBe('2026-03-29');
-  });
-
-  it('formats measurements and medications for display', () => {
-    expect(formatMeasurementValue({ type: 'blood_pressure', systolic: 128, diastolic: 82 })).toBe('128/82');
-    expect(formatMeasurementValue({ type: 'pulse', numericValue: 0 })).toBe(0);
-    expect(formatMeasurementValue({ type: 'mood', textValue: 'Good' })).toBe('Good');
-    expect(formatMedication({ name: 'Metoprolol', dosage: '25mg', frequency: 'BID' })).toBe('Metoprolol 25mg BID');
-    expect(formatMedication('Aspirin')).toBe('Aspirin');
+  it('formats readings, initials and lists', () => {
+    expect(formatReading({ systolic: 128, diastolic: 82 })).toBe('128/82');
+    expect(formatReading({ num: 0 })).toBe('0');
+    expect(formatReading({ text: 'Dal and rice' })).toBe('Dal and rice');
+    expect(formatReading(null)).toBe('—');
+    expect(initials('Dr Meera  Nair')).toBe('DM');
+    expect(initials(null)).toBe('');
+    expect(splitList(' Penicillin, , Latex ')).toEqual(['Penicillin', 'Latex']);
   });
 });

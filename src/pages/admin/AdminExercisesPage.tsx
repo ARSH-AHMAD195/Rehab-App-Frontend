@@ -1,130 +1,87 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
-import { exerciseService } from '../../services/apiServices';
+import { Pencil, Plus, Video } from 'lucide-react';
+import { exerciseService, type ExerciseInput } from '../../services/apiServices';
 import { errorMessage } from '../../services/api';
 import { qk } from '../../lib/queryClient';
 import { useFormErrors } from '../../lib/forms';
-import { EXERCISE_CATEGORIES, FREQUENCIES, MIN } from '../../lib/constants';
-import { labelize } from '../../lib/format';
+import { labelize, splitList } from '../../lib/format';
 import { Alert, Badge, Button, ConfirmDialog, ErrorState, Field, Input, Modal, ModalActions, PageHeader, PageLoader, Select, Textarea } from '../../components/ui';
 import { useToast } from '../../components/ui/toast';
-import type { Exercise, ExerciseCategory } from '../../types/api';
+import type { Category, Exercise } from '../../types/api';
 
-const EMPTY_FORM = {
-  title: '',
-  description: '',
-  category: 'mobility' as ExerciseCategory,
-  instructions: '',
-  videoUrl: '',
-  defaultDurationMinutes: '15',
-  defaultSets: '3',
-  defaultReps: '10',
-  defaultFrequency: 'Daily',
-  safetyNotes: '',
-  contraindications: '',
-};
-type FormState = typeof EMPTY_FORM;
+const formOf = (ex?: Exercise) => ({
+  name: ex?.name ?? '',
+  categoryId: ex?.categoryId ?? '',
+  description: ex?.description ?? '',
+  instructions: ex?.instructions.join('\n') ?? '',
+  videoUrl: ex?.video?.url ?? '',
+});
 
-const splitList = (text: string, separator: string | RegExp) =>
-  text
-    .split(separator)
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-const ADMIN_LIBRARY = { activeOnly: 'false' };
-
-const AddExerciseModal = ({ onClose }: { onClose: () => void }) => {
+/** Adds an exercise, or edits one. Only changed fields are sent; a video link is checked with YouTube on save. */
+const ExerciseModal = ({ exercise, categories, onClose }: { exercise?: Exercise; categories: Category[]; onClose: () => void }) => {
   const toast = useToast();
   const queryClient = useQueryClient();
   const form = useFormErrors();
-  const [f, setF] = useState<FormState>(EMPTY_FORM);
-  const set = (field: keyof FormState) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setF((p) => ({ ...p, [field]: e.target.value }));
+  const initial = formOf(exercise);
+  const [f, setF] = useState(initial);
+  const set = (field: keyof typeof initial) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setF((p) => ({ ...p, [field]: e.target.value }));
 
-  const create = useMutation({
-    mutationFn: () =>
-      exerciseService.createExercise({
-        title: f.title.trim(),
-        description: f.description.trim(),
-        category: f.category,
+  const save = useMutation({
+    mutationFn: () => {
+      const all: ExerciseInput = {
+        name: f.name.trim(),
+        categoryId: f.categoryId,
+        description: f.description.trim() || null,
         instructions: splitList(f.instructions, '\n'),
-        videoUrl: f.videoUrl.trim(),
-        defaultDurationMinutes: Number(f.defaultDurationMinutes),
-        defaultSets: Number(f.defaultSets),
-        defaultReps: Number(f.defaultReps),
-        defaultFrequency: f.defaultFrequency,
-        contraindications: splitList(f.contraindications, ','),
-        // Omit when blank so the server's standard safety notice applies
-        ...(f.safetyNotes.trim() && { safetyNotes: f.safetyNotes.trim() }),
-      }),
-    onSuccess: () => {
-      toast.success(`"${f.title.trim()}" added to the exercise library.`);
+        videoUrl: f.videoUrl.trim() || null,
+      };
+      if (!exercise) return exerciseService.create({ ...all, name: all.name!, categoryId: all.categoryId! });
+      const changed = Object.fromEntries(Object.entries(all).filter(([k]) => f[k as keyof typeof f] !== initial[k as keyof typeof initial]));
+      return exerciseService.update(exercise.id, changed);
+    },
+    onSuccess: (ex) => {
+      toast.success(`"${ex.name}" ${exercise ? 'updated' : 'added to the library'}.`);
       void queryClient.invalidateQueries({ queryKey: ['library'] });
       onClose();
     },
-    onError: (err) => form.fromApiError(err, 'Could not create the exercise. Please try again.'),
+    onError: (err) => form.fromApiError(err, 'Could not save the exercise. Please try again.'),
   });
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const steps = e.currentTarget.elements.namedItem('instructions') as HTMLTextAreaElement;
-    steps.setCustomValidity(splitList(f.instructions, '\n').length ? '' : 'Add at least one step.');
-    if (form.validate(e.currentTarget)) create.mutate();
+    if (form.validate(e.currentTarget)) save.mutate();
   };
 
   return (
-    <Modal title="Add an exercise" description="Becomes available to all doctors for prescribing" onClose={onClose} size="xl">
+    <Modal title={exercise ? 'Edit exercise' : 'Add an exercise'} description="Doctors pick from the library when assigning plans" onClose={onClose} size="xl">
       <form noValidate onSubmit={handleSubmit} onChange={form.onChange} className="space-y-4">
         {form.formError && <Alert tone="error">{form.formError}</Alert>}
-        <Field label="Title" error={form.errors.title}>
-          <Input name="title" required minLength={MIN.exerciseTitle} maxLength={150} value={f.title} onChange={set('title')} placeholder="e.g. Inspiratory muscle training" />
-        </Field>
-        <Field label="Description" error={form.errors.description}>
-          <Textarea name="description" rows={2} required minLength={MIN.exerciseDescription} maxLength={1000} value={f.description} onChange={set('description')} placeholder="Clinical objective and benefits." />
-        </Field>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-          <Field label="Category">
-            <Select name="category" value={f.category} onChange={set('category')}>
-              {EXERCISE_CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {labelize(c)}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Name" error={form.errors.name}>
+            <Input name="name" required maxLength={150} value={f.name} onChange={set('name')} placeholder="e.g. Seated knee extension" />
+          </Field>
+          <Field label="Category" error={form.errors.categoryId}>
+            <Select name="categoryId" required value={f.categoryId} onChange={set('categoryId')}>
+              <option value="">Choose…</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
                 </option>
               ))}
             </Select>
           </Field>
-          <Field label="Default frequency">
-            <Select name="defaultFrequency" value={f.defaultFrequency} onChange={set('defaultFrequency')}>
-              {FREQUENCIES.map((x) => (
-                <option key={x}>{x}</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Minutes" error={form.errors.defaultDurationMinutes}>
-            <Input name="defaultDurationMinutes" type="number" inputMode="numeric" min="1" max="180" required value={f.defaultDurationMinutes} onChange={set('defaultDurationMinutes')} />
-          </Field>
-          <Field label="Sets" error={form.errors.defaultSets}>
-            <Input name="defaultSets" type="number" inputMode="numeric" min="1" max="20" required value={f.defaultSets} onChange={set('defaultSets')} />
-          </Field>
-          <Field label="Reps" error={form.errors.defaultReps}>
-            <Input name="defaultReps" type="number" inputMode="numeric" min="0" max="100" required value={f.defaultReps} onChange={set('defaultReps')} />
-          </Field>
         </div>
+        <Field label="Description (optional)" error={form.errors.description}>
+          <Textarea name="description" rows={2} value={f.description} onChange={set('description')} placeholder="What it’s for." />
+        </Field>
         <Field label="Step-by-step instructions" hint="One step per line" error={form.errors.instructions}>
-          <Textarea name="instructions" rows={4} value={f.instructions} onChange={(e) => {
-            e.target.setCustomValidity('');
-            set('instructions')(e);
-          }} />
+          <Textarea name="instructions" rows={4} value={f.instructions} onChange={set('instructions')} />
         </Field>
-        <Field label="Safety notes (optional)" hint="Leave blank to use the standard safety notice">
-          <Textarea name="safetyNotes" rows={2} maxLength={1000} value={f.safetyNotes} onChange={set('safetyNotes')} />
+        <Field label="YouTube video (optional)" hint="Unlisted or Public, with embedding allowed. It’s checked with YouTube when you save." error={form.errors.videoUrl}>
+          <Input name="videoUrl" value={f.videoUrl} onChange={set('videoUrl')} placeholder="https://youtu.be/…" />
         </Field>
-        <Field label="Contraindications (optional)" hint="Separate with commas">
-          <Input name="contraindications" value={f.contraindications} onChange={set('contraindications')} placeholder="e.g. Unstable angina, Acute DVT" />
-        </Field>
-        <Field label="Video URL (optional)" error={form.errors.videoUrl}>
-          <Input name="videoUrl" type="url" value={f.videoUrl} onChange={set('videoUrl')} placeholder="https://www.youtube.com/watch?v=…" />
-        </Field>
-        <ModalActions onCancel={onClose} submitLabel="Save to library" loading={create.isPending} />
+        <ModalActions onCancel={onClose} submitLabel={exercise ? 'Save changes' : 'Save to library'} loading={save.isPending} />
       </form>
     </Modal>
   );
@@ -133,31 +90,40 @@ const AddExerciseModal = ({ onClose }: { onClose: () => void }) => {
 export const AdminExercisesPage = () => {
   const toast = useToast();
   const queryClient = useQueryClient();
-  const [showAdd, setShowAdd] = useState(false);
+  const [editing, setEditing] = useState<Exercise | 'new' | null>(null);
   const [pendingToggle, setPendingToggle] = useState<Exercise | null>(null);
 
-  const library = useQuery({ queryKey: qk.library(ADMIN_LIBRARY), queryFn: () => exerciseService.getLibrary(ADMIN_LIBRARY).then((r) => r.exercises) });
+  const categories = useQuery({ queryKey: qk.categories(), queryFn: () => exerciseService.getCategories() });
+  // The API lists active and deactivated exercises separately.
+  // ponytail: first 100 of each; add cursor paging when the library outgrows that
+  const library = useQuery({
+    queryKey: qk.library({ admin: true }),
+    queryFn: async () => {
+      const [active, inactive] = await Promise.all([exerciseService.list({ active: true, limit: 100 }), exerciseService.list({ active: false, limit: 100 })]);
+      return [...active.data, ...inactive.data];
+    },
+  });
 
   const toggle = useMutation({
-    mutationFn: (ex: Exercise) => (ex.isActive ? exerciseService.deactivateExercise(ex._id) : exerciseService.updateExercise(ex._id, { isActive: true })),
+    mutationFn: (ex: Exercise) => (ex.active ? exerciseService.deactivate(ex.id) : exerciseService.update(ex.id, { active: true })),
     onSuccess: (_res, ex) => {
-      toast.success(`"${ex.title}" ${ex.isActive ? 'deactivated' : 'reactivated'}.`);
+      toast.success(`"${ex.name}" ${ex.active ? 'deactivated' : 'reactivated'}.`);
       setPendingToggle(null);
       void queryClient.invalidateQueries({ queryKey: ['library'] });
     },
     onError: (err) => toast.error(errorMessage(err, 'Could not update the exercise.')),
   });
 
-  if (library.isPending) return <PageLoader label="Loading exercise library…" />;
-  if (library.isError) return <ErrorState error={library.error} onRetry={() => void library.refetch()} />;
+  if (library.isPending || categories.isPending) return <PageLoader label="Loading exercise library…" />;
+  if (library.isError || categories.isError) return <ErrorState error={library.error ?? categories.error} onRetry={() => void library.refetch()} />;
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Exercise library"
-        description="Standard prehabilitation exercises doctors can prescribe"
+        description="Exercises doctors can put in a patient’s plan"
         actions={
-          <Button onClick={() => setShowAdd(true)}>
+          <Button onClick={() => setEditing('new')}>
             <Plus className="h-4 w-4" aria-hidden="true" />
             Add exercise
           </Button>
@@ -171,7 +137,7 @@ export const AdminExercisesPage = () => {
               <tr>
                 <th scope="col" className="p-4">Exercise</th>
                 <th scope="col" className="p-4">Category</th>
-                <th scope="col" className="p-4">Defaults</th>
+                <th scope="col" className="p-4">Video</th>
                 <th scope="col" className="p-4">Status</th>
                 <th scope="col" className="p-4 text-right">
                   <span className="sr-only">Actions</span>
@@ -187,24 +153,34 @@ export const AdminExercisesPage = () => {
                 </tr>
               ) : (
                 library.data.map((ex) => (
-                  <tr key={ex._id} className="hover:bg-slate-50">
+                  <tr key={ex.id} className="hover:bg-slate-50">
                     <td className="p-4">
-                      <span className="block font-semibold text-slate-900">{ex.title}</span>
-                      <span className="line-clamp-1 text-slate-600">{ex.description}</span>
+                      <span className="block font-semibold text-slate-900">{ex.name}</span>
+                      {ex.description && <span className="line-clamp-1 text-slate-600">{ex.description}</span>}
                     </td>
                     <td className="p-4">
                       <Badge tone="teal">{labelize(ex.category)}</Badge>
                     </td>
-                    <td className="whitespace-nowrap p-4 text-slate-700">
-                      {ex.defaultDurationMinutes}m · {ex.defaultSets} × {ex.defaultReps} · {ex.defaultFrequency}
+                    <td className="p-4">
+                      {ex.video ? (
+                        <a href={ex.video.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-teal-800 underline">
+                          <Video className="h-4 w-4" aria-hidden="true" />
+                          Watch<span className="sr-only"> (opens in a new tab)</span>
+                        </a>
+                      ) : (
+                        <span className="text-slate-500">None</span>
+                      )}
                     </td>
                     <td className="p-4">
-                      <Badge tone={ex.isActive ? 'emerald' : 'slate'}>{ex.isActive ? 'Active' : 'Inactive'}</Badge>
+                      <Badge tone={ex.active ? 'emerald' : 'slate'}>{ex.active ? 'Active' : 'Deactivated'}</Badge>
                     </td>
-                    <td className="p-4 text-right">
-                      <Button variant={ex.isActive ? 'danger' : 'success'} size="sm" onClick={() => setPendingToggle(ex)}>
-                        {ex.isActive ? 'Deactivate' : 'Activate'}
-                        <span className="sr-only"> {ex.title}</span>
+                    <td className="whitespace-nowrap p-4 text-right">
+                      <Button variant="ghost" size="sm" onClick={() => setEditing(ex)} aria-label={`Edit ${ex.name}`}>
+                        <Pencil className="h-4 w-4" aria-hidden="true" />
+                      </Button>
+                      <Button variant={ex.active ? 'danger' : 'success'} size="sm" onClick={() => setPendingToggle(ex)}>
+                        {ex.active ? 'Deactivate' : 'Activate'}
+                        <span className="sr-only"> {ex.name}</span>
                       </Button>
                     </td>
                   </tr>
@@ -215,18 +191,18 @@ export const AdminExercisesPage = () => {
         </div>
       </div>
 
-      {showAdd && <AddExerciseModal onClose={() => setShowAdd(false)} />}
+      {editing && <ExerciseModal exercise={editing === 'new' ? undefined : editing} categories={categories.data} onClose={() => setEditing(null)} />}
 
       {pendingToggle && (
         <ConfirmDialog
-          title={pendingToggle.isActive ? 'Deactivate this exercise?' : 'Reactivate this exercise?'}
+          title={pendingToggle.active ? 'Deactivate this exercise?' : 'Reactivate this exercise?'}
           message={
-            pendingToggle.isActive
-              ? `"${pendingToggle.title}" won't be available for new prescriptions. Existing prescriptions are not changed.`
-              : `"${pendingToggle.title}" will be available for prescribing again.`
+            pendingToggle.active
+              ? `"${pendingToggle.name}" can’t be added to new plans. Plans that already include it keep it until the doctor changes them.`
+              : `"${pendingToggle.name}" can be added to plans again.`
           }
-          confirmLabel={pendingToggle.isActive ? 'Deactivate' : 'Reactivate'}
-          tone={pendingToggle.isActive ? 'danger' : 'primary'}
+          confirmLabel={pendingToggle.active ? 'Deactivate' : 'Reactivate'}
+          tone={pendingToggle.active ? 'danger' : 'primary'}
           loading={toggle.isPending}
           onConfirm={() => toggle.mutate(pendingToggle)}
           onCancel={() => setPendingToggle(null)}

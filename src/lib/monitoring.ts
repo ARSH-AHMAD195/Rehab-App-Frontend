@@ -41,6 +41,6 @@ export const reportError = (error: unknown, context?: Record<string, unknown>) =
   else console.error(error, context ?? '');
 };
 
-export const setMonitoringUser = (user: { _id: string; role: string } | null) => {
-  sentry?.setUser(user ? { id: user._id, segment: user.role } : null);
+export const setMonitoringUser = (user: { id: string; role: string } | null) => {
+  sentry?.setUser(user ? { id: user.id, segment: user.role } : null);
 };

@@ -1,11 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { authService } from '../services/authService';
+import { onAuthStateChanged } from 'firebase/auth';
+import { firebaseAuth } from '../lib/firebase';
+import { authService, isAccountRejection } from '../services/authService';
 import { onUnauthorized } from '../services/api';
 import { setMonitoringUser } from '../lib/monitoring';
 import type { User } from '../types/api';
-import { onAuthStateChanged } from 'firebase/auth';
-import { firebaseAuth } from '../lib/firebase';
 
 export type EndReason = 'expired' | 'idle' | null;
 
@@ -26,6 +26,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [endReason, setEndReason] = useState<EndReason>(null);
 
+  const signedIn = useCallback((next: User) => {
+    setUser(next);
+    setMonitoringUser(next);
+    setEndReason(null);
+  }, []);
+
   const signedOut = useCallback(
     (reason: EndReason) => {
       setUser(null);
@@ -37,84 +43,50 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     [queryClient]
   );
 
-  // The session is an httpOnly cookie, so the only way to know who's signed in is to ask.
-  
-
-useEffect(() => {
-  const unsubscribe = onAuthStateChanged(firebaseAuth, async (firebaseUser) => {
-      console.log('Firebase state:', firebaseUser?.email ?? 'signed out');
-
-      if (!firebaseUser) {
-        setUser(null);
-        setMonitoringUser(null);
+  // Firebase restores a saved session on load; the Auth API tells us who that is.
+  useEffect(
+    () =>
+      onAuthStateChanged(firebaseAuth, async (firebaseUser) => {
+        if (firebaseUser) {
+          try {
+            signedIn(await authService.getMe());
+          } catch (err) {
+            // Only end the Firebase session if the account itself was refused. A network error or a
+            // sleeping API keeps it, so the next load can try again without asking for the password.
+            if (isAccountRejection(err)) await authService.logout().catch(() => {});
+            setUser(null);
+          }
+        }
         setLoading(false);
-        return;
-      }
+      }),
+    [signedIn]
+  );
 
-      try {
-        await firebaseUser.getIdToken();
-
-        const user = await authService.getMe();
-
-        console.log('Restored backend user:', user.role);
-
-        setUser(user);
-        setMonitoringUser(user);
-      } catch (error) {
-        console.error('Session restoration failed:', error);
-        await firebaseAuth.signOut().catch(() => {});
-        setUser(null);
-        setMonitoringUser(null);
-      } finally {
-        setLoading(false);
-      }
-    });
-
-    return unsubscribe;
-  }, []);
-
-
-
-  // Any 401 from a protected endpoint means the cookie expired or was revoked.
+  // A 401 from any API means the session ended (expired, revoked or account deactivated).
   const userRef = useRef(user);
   userRef.current = user;
   useEffect(() => {
-    onUnauthorized(() => signedOut(userRef.current ? 'expired' : null));
+    onUnauthorized(() => {
+      if (!userRef.current) return;
+      void authService.logout().catch(() => {});
+      signedOut('expired');
+    });
     return () => onUnauthorized(() => {});
   }, [signedOut]);
 
-  
   const login = useCallback(
-    async (credentials: { email: string; password: string }): Promise<User> => {
-      try {
-        const user = await authService.login(credentials);
-        console.log('Login succeeded:', {
-          id: user._id,
-          role: user.role,
-        });
-        setUser(user);
-        setMonitoringUser(user);
-        setEndReason(null);
-
-        return user;
-      } catch (error) {
-        console.error('Login failed:', error);
-        throw error;
-      }
+    async (credentials: { email: string; password: string }) => {
+      const next = await authService.login(credentials);
+      signedIn(next);
+      return next;
     },
-    []
+    [signedIn]
   );
-
 
   const logout = useCallback(
     async (reason: EndReason = null) => {
-      try {
-        await authService.logout();
-      } catch {
-        // The local session is cleared regardless; an expired cookie can't be logged out twice.
-      } finally {
-        signedOut(reason);
-      }
+      await authService.logout().catch(() => {});
+      signedOut(reason);
     },
     [signedOut]
   );
