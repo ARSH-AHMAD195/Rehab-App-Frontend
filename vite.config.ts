@@ -53,9 +53,10 @@ export default defineConfig(() => {
     server: { port: 5173, host: true, strictPort: true },
     preview: { port: 4173, strictPort: true },
     build: {
+      outDir: 'dist',
+      emptyOutDir: true,
       rollupOptions: {
         output: {
-          // Long-lived vendor chunks: app deploys don't invalidate cached React/charting code
           manualChunks: {
             react: ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query'],
             charts: ['recharts'],
