@@ -11,6 +11,8 @@ const keyFor = (patientId: string, date: string) => `${PREFIX}${patientId}_${dat
 
 /** Today's skips for this patient. Older days are removed on the way. */
 export const readSkips = (patientId: string, date: string): Skips => {
+  // No date yet (today's checklist didn't load): read nothing and, above all, delete nothing
+  if (!date) return {};
   try {
     const today = keyFor(patientId, date);
     for (let i = localStorage.length - 1; i >= 0; i--) {
@@ -24,6 +26,7 @@ export const readSkips = (patientId: string, date: string): Skips => {
 };
 
 export const writeSkips = (patientId: string, date: string, skips: Skips) => {
+  if (!date) return;
   try {
     if (Object.keys(skips).length) localStorage.setItem(keyFor(patientId, date), JSON.stringify(skips));
     else localStorage.removeItem(keyFor(patientId, date));

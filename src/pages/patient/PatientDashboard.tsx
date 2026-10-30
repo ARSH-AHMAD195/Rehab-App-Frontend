@@ -1,18 +1,13 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Plus, Stethoscope, Undo2, XCircle } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Plus, Stethoscope } from 'lucide-react';
 import { useSignedInUser } from '../../context/AuthContext';
 import { completionService, profileService, vitalsService } from '../../services/apiServices';
-import { errorMessage } from '../../services/api';
 import { qk } from '../../lib/queryClient';
 import { daysUntil, firstName, formatDate, formatReading, weekOf } from '../../lib/format';
 import { useSkips } from '../../lib/skips';
-import { Button, Card, EmptyState, ErrorState, PageLoader, SectionTitle, buttonClass } from '../../components/ui';
-import { useToast } from '../../components/ui/toast';
-import { CompleteExerciseModal } from '../../components/exercise/CompleteExerciseModal';
-import { SkipExerciseModal } from '../../components/exercise/SkipExerciseModal';
-import { DonePill, ExerciseCard } from '../../components/exercise/ExerciseCard';
+import { Card, EmptyState, ErrorState, PageLoader, SectionTitle, buttonClass } from '../../components/ui';
+import { TodayExerciseCard } from '../../components/exercise/TodayExerciseCard';
 import type { Checklist, ChecklistItem, Reading, VitalType } from '../../types/api';
 
 const TILES: { type: VitalType; label: string }[] = [
@@ -75,30 +70,13 @@ const ProgrammeCard = ({ day, totalDays, surgeryDate }: { day: number; totalDays
 
 /** Today's planned exercises as cards: mark done, or say you couldn't. */
 const TodayExercises = ({ patientId, checklist }: { patientId: string; checklist: Checklist }) => {
-  const toast = useToast();
-  const queryClient = useQueryClient();
-  const [completing, setCompleting] = useState<ChecklistItem | null>(null);
-  const [skipping, setSkipping] = useState<ChecklistItem | null>(null);
   const { skips, skip, unskip } = useSkips(patientId, checklist.date);
   const { items, doneCount, plannedCount, date } = checklist;
-
-  const undo = useMutation({
-    mutationFn: completionService.undo,
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['my'] }),
-    onError: (err) => toast.error(errorMessage(err, 'Could not undo. Please try again.')),
-  });
 
   const progress = plannedCount ? Math.round((doneCount / plannedCount) * 100) : 0;
   // To do first, then skipped, then done
   const rank = (i: ChecklistItem) => (i.status === 'DONE' ? 2 : skips[i.itemId] ? 1 : 0);
   const ordered = [...items].sort((a, b) => rank(a) - rank(b));
-
-  const undoButton = (tickId: string, label: string) => (
-    <Button variant="ghost" size="sm" className="w-full" onClick={() => undo.mutate(tickId)} loading={undo.isPending && undo.variables === tickId}>
-      <Undo2 className="h-4 w-4" aria-hidden="true" />
-      {label}
-    </Button>
-  );
 
   return (
     <section aria-labelledby="today-heading" className="space-y-4">
@@ -123,63 +101,18 @@ const TodayExercises = ({ patientId, checklist }: { patientId: string; checklist
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
-          {ordered.map((item) => {
-            const done = item.status === 'DONE';
-            const skipped = done ? undefined : skips[item.itemId];
-            const lastTick = item.completions.at(-1);
-            return (
-              <ExerciseCard
-                key={item.itemId}
-                exercise={item.exercise}
-                target={item.target}
-                notes={item.notes}
-                status={
-                  done ? (
-                    <DonePill />
-                  ) : item.timesPerDay > 1 ? (
-                    <span className="shrink-0 text-sm font-semibold text-slate-600">
-                      {item.doneCount} of {item.timesPerDay} times
-                    </span>
-                  ) : undefined
-                }
-              >
-                {skipped ? (
-                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-950">
-                    <span className="flex items-center gap-1.5 font-semibold">
-                      <XCircle className="h-4 w-4 text-amber-700" aria-hidden="true" />
-                      Skipped today · {skipped}
-                    </span>
-                    <button type="button" onClick={() => unskip(item.itemId)} className="font-semibold text-teal-800 underline">
-                      Undo<span className="sr-only"> skip for {item.exercise.name}</span>
-                    </button>
-                  </div>
-                ) : done ? (
-                  lastTick && undoButton(lastTick.id, 'Undo')
-                ) : (
-                  <div className="space-y-1">
-                    <Button size="lg" className="w-full" onClick={() => setCompleting(item)}>
-                      <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
-                      Mark as done<span className="sr-only">: {item.exercise.name}</span>
-                    </Button>
-                    {lastTick && undoButton(lastTick.id, 'Undo last tick')}
-                    <button
-                      type="button"
-                      onClick={() => setSkipping(item)}
-                      className="flex min-h-11 w-full items-center justify-center gap-1.5 text-sm font-bold text-teal-900 hover:underline"
-                    >
-                      <XCircle className="h-4 w-4" aria-hidden="true" />
-                      I couldn’t do this today
-                    </button>
-                  </div>
-                )}
-              </ExerciseCard>
-            );
-          })}
+          {ordered.map((item) => (
+            <TodayExerciseCard
+              key={item.itemId}
+              item={item}
+              date={date}
+              skipped={skips[item.itemId]}
+              onSkip={(reason) => skip(item.itemId, reason)}
+              onUnskip={() => unskip(item.itemId)}
+            />
+          ))}
         </div>
       )}
-
-      {completing && <CompleteExerciseModal item={completing} date={date} onClose={() => setCompleting(null)} />}
-      {skipping && <SkipExerciseModal name={skipping.exercise.name} onSkip={(reason) => skip(skipping.itemId, reason)} onClose={() => setSkipping(null)} />}
     </section>
   );
 };

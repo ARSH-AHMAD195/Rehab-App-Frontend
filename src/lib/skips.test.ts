@@ -22,6 +22,10 @@ describe('skipped exercises (on this device)', () => {
     expect(localStorage.getItem('ffs_skips_p1_2026-10-30')).toBeNull();
     expect(readSkips('p2', '2026-10-30')).toEqual({ c: 'No time' });
 
+    // Without a date nothing is read or cleaned up
+    expect(readSkips('p2', '')).toEqual({});
+    expect(readSkips('p2', '2026-10-30')).toEqual({ c: 'No time' });
+
     writeSkips('p1', '2026-10-31', {});
     expect(localStorage.getItem('ffs_skips_p1_2026-10-31')).toBeNull();
 
