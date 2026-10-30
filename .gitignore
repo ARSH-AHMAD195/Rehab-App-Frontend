@@ -9,3 +9,5 @@ playwright/.cache/
 backend/
 node_modules/
 .env
+
+example/

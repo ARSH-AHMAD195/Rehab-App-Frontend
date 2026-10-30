@@ -4,10 +4,11 @@ import { Plus, Stethoscope } from 'lucide-react';
 import { useSignedInUser } from '../../context/AuthContext';
 import { completionService, profileService, vitalsService } from '../../services/apiServices';
 import { qk } from '../../lib/queryClient';
-import { daysUntil, firstName, formatDate, formatReading, weekOf } from '../../lib/format';
+import { daysUntil, firstName, formatDate, formatReading, fromDateKey } from '../../lib/format';
 import { useSkips } from '../../lib/skips';
 import { Card, EmptyState, ErrorState, PageLoader, SectionTitle, buttonClass } from '../../components/ui';
 import { TodayExerciseCard } from '../../components/exercise/TodayExerciseCard';
+import { ProgramProgressCard } from '../../components/patient/ProgramProgressCard';
 import type { Checklist, ChecklistItem, Reading, VitalType } from '../../types/api';
 
 const TILES: { type: VitalType; label: string }[] = [
@@ -38,36 +39,6 @@ const VitalTile = ({ label, reading }: { label: string; reading?: Reading }) => 
   </div>
 );
 
-/** "Week 2 of 4 · Day 12 of 28": one bar segment per week, the current week filling up. */
-const ProgrammeCard = ({ day, totalDays, surgeryDate }: { day: number; totalDays: number; surgeryDate: string }) => {
-  const { week, weeks } = weekOf(day, totalDays);
-  return (
-    <Card aria-label="Your prehabilitation programme" className="py-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="text-base font-bold text-slate-900">
-          Week {week} of {weeks}
-        </p>
-        <p className="text-sm text-slate-600">
-          Day {day} of {totalDays}
-        </p>
-      </div>
-      <div className="mt-3 flex gap-1.5" role="progressbar" aria-valuenow={day} aria-valuemin={1} aria-valuemax={totalDays} aria-label={`Day ${day} of ${totalDays}`}>
-        {Array.from({ length: weeks }, (_, i) => {
-          // Share of this week's days already reached (the last week may be shorter than 7)
-          const weekDays = Math.min(7, totalDays - i * 7);
-          const fill = Math.max(0, Math.min(1, (day - i * 7) / weekDays));
-          return (
-            <span key={i} className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200">
-              <span className="block h-full rounded-full bg-teal-700" style={{ width: `${fill * 100}%` }} />
-            </span>
-          );
-        })}
-      </div>
-      <p className="mt-3 text-sm text-slate-700">Surgery planned for {formatDate(surgeryDate, { weekday: 'short', day: 'numeric', month: 'long' })}</p>
-    </Card>
-  );
-};
-
 /** Today's planned exercises as cards: mark done, or say you couldn't. */
 const TodayExercises = ({ patientId, checklist }: { patientId: string; checklist: Checklist }) => {
   const { skips, skip, unskip } = useSkips(patientId, checklist.date);
@@ -79,9 +50,9 @@ const TodayExercises = ({ patientId, checklist }: { patientId: string; checklist
   const ordered = [...items].sort((a, b) => rank(a) - rank(b));
 
   return (
-    <section aria-labelledby="today-heading" className="space-y-4">
+    <section className="space-y-4">
       <div>
-        <h2 id="today-heading" className="text-lg font-bold text-slate-900">
+        <h2 className="text-lg font-bold text-slate-900">
           Today’s exercises
         </h2>
         <p className="text-sm text-slate-700">
@@ -152,7 +123,12 @@ export const PatientDashboard = () => {
         </Link>
       </header>
 
-      {showProgramme && <ProgrammeCard day={Math.min(dayNumber, totalDays)} totalDays={totalDays} surgeryDate={surgeryDate!} />}
+      {/* 30px above Today’s exercises, as designed (24px from the page’s spacing + 6) */}
+      {showProgramme && (
+        <div className="pb-1.5">
+          <ProgramProgressCard currentDay={dayNumber} totalDays={totalDays} surgeryDate={surgeryDate ? fromDateKey(surgeryDate) : null} />
+        </div>
+      )}
 
       <TodayExercises patientId={user.id} checklist={checklist.data} />
 
