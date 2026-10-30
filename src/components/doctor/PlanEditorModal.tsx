@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Search, Trash2 } from 'lucide-react';
 import { exerciseService, planService, type PlanItemInput } from '../../services/apiServices';
 import { ApiError } from '../../services/api';
 import { qk } from '../../lib/queryClient';
@@ -40,11 +40,15 @@ export const PlanEditorModal = ({ patientId, plan, onClose }: { patientId: strin
   const queryClient = useQueryClient();
   const form = useFormErrors();
   const [rows, setRows] = useState<Row[]>(() => toRows(plan));
+  const [search, setSearch] = useState('');
 
   const library = useQuery({ queryKey: qk.library({ active: true, limit: 100 }), queryFn: () => exerciseService.list({ active: true, limit: 100 }) });
   const exercises = library.data?.data ?? [];
   // Exercises already in the plan stay pickable even if an admin has since deactivated them
   const options = [...exercises, ...plan.items.map((i) => i.exercise).filter((e) => !exercises.some((x) => x.id === e.id))];
+  const term = search.trim().toLowerCase();
+  // A row's current choice always stays in its list, even when the search hides it
+  const optionsFor = (selected: string) => options.filter((ex) => !term || ex.id === selected || ex.name.toLowerCase().includes(term) || ex.category.toLowerCase().includes(term));
 
   const update = (i: number, patch: Partial<Row>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
 
@@ -82,6 +86,13 @@ export const PlanEditorModal = ({ patientId, plan, onClose }: { patientId: strin
           {library.isError && <Alert tone="error">The exercise library could not be loaded.</Alert>}
           {!library.isError && options.length === 0 && <Alert tone="warning">The exercise library is empty. An admin needs to add exercises first.</Alert>}
 
+          {options.length > 0 && (
+            <div className="relative">
+              <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-500" aria-hidden="true" />
+              <Input type="search" aria-label="Search exercises by name or category" value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()} placeholder="Search exercises…" className="pl-9" />
+            </div>
+          )}
+
           {rows.length === 0 ? (
             <EmptyState>No exercises in the plan. Saving an empty plan clears it.</EmptyState>
           ) : (
@@ -94,7 +105,7 @@ export const PlanEditorModal = ({ patientId, plan, onClose }: { patientId: strin
                       <Field label={`Exercise ${i + 1}`} error={form.errors[`items.${i}.exerciseId`]} className="flex-1">
                         <Select name={`items.${i}.exerciseId`} required value={r.exerciseId} onChange={(e) => update(i, { exerciseId: e.target.value })}>
                           <option value="">Choose…</option>
-                          {options.map((ex) => (
+                          {optionsFor(r.exerciseId).map((ex) => (
                             <option key={ex.id} value={ex.id} disabled={taken.has(ex.id)}>
                               {ex.name}
                               {ex.active ? '' : ' (deactivated)'}

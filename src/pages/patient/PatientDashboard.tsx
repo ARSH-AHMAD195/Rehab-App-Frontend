@@ -6,7 +6,7 @@ import { useSignedInUser } from '../../context/AuthContext';
 import { completionService, profileService, vitalsService } from '../../services/apiServices';
 import { errorMessage } from '../../services/api';
 import { qk } from '../../lib/queryClient';
-import { daysUntil, describeTarget, formatDate, formatReading } from '../../lib/format';
+import { daysUntil, describeTarget, firstName, formatDate, formatReading } from '../../lib/format';
 import { cn } from '../../lib/cn';
 import { Button, Card, EmptyState, ErrorState, PageLoader, SectionTitle, buttonClass } from '../../components/ui';
 import { useToast } from '../../components/ui/toast';
@@ -66,6 +66,11 @@ export const PatientDashboard = () => {
   const ordered = [...items].sort((a, b) => Number(a.status === 'DONE') - Number(b.status === 'DONE'));
   const surgeryDate = medical.data?.plannedSurgeryDate;
   const days = daysUntil(surgeryDate);
+  // Programme progress: day 1 is the day they were enrolled, the last day is surgery day
+  const enrolled = profile.data?.createdAt;
+  const totalDays = enrolled && surgeryDate ? daysUntil(surgeryDate, new Date(enrolled)) : null;
+  const dayNumber = enrolled ? -(daysUntil(enrolled) ?? 0) + 1 : null;
+  const showProgramme = totalDays !== null && totalDays > 0 && dayNumber !== null && days !== null && days >= 0;
   const doctors = profile.data?.doctors ?? [];
 
   return (
@@ -73,7 +78,7 @@ export const PatientDashboard = () => {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
-            {greeting()}, {user.name.split(' ')[0]}
+            {greeting()}, {firstName(user.name)}
           </h1>
           {surgeryDate && days !== null && days >= 0 && (
             <p className="mt-1 text-base text-slate-700">
@@ -89,6 +94,24 @@ export const PatientDashboard = () => {
           Log vitals
         </Link>
       </header>
+
+      {showProgramme && (
+        <Card aria-label="Your prehabilitation programme" className="py-4">
+          <p className="text-base font-bold text-slate-900">
+            Day {Math.min(dayNumber, totalDays)} <span className="font-normal text-slate-600">of {totalDays} in your prehab programme</span>
+          </p>
+          <div
+            className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-slate-200"
+            role="progressbar"
+            aria-valuenow={Math.min(dayNumber, totalDays)}
+            aria-valuemin={1}
+            aria-valuemax={totalDays}
+            aria-label="Days of your programme completed"
+          >
+            <div className="h-full rounded-full bg-teal-700" style={{ width: `${Math.min(100, (dayNumber / totalDays) * 100)}%` }} />
+          </div>
+        </Card>
+      )}
 
       <Card aria-labelledby="today-heading">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

@@ -50,6 +50,13 @@ export function fromDateKey(key: string) {
   return new Date(y, m - 1, d);
 }
 
+/** "2026-10-30" + 1 -> "2026-10-31", across month and year ends. */
+export const addDays = (key: string, days: number) => {
+  const d = fromDateKey(key);
+  d.setDate(d.getDate() + days);
+  return localDateKey(d);
+};
+
 /** The value of a vital reading as text: "128/82", "76", or the nutrition note. */
 export const formatReading = (value: ReadingValue | null | undefined) => {
   if (!value) return '—';
@@ -62,6 +69,9 @@ export const describeTarget = (target: Target | null | undefined) =>
   [target?.sets && target.reps ? `${target.sets} × ${target.reps}` : target?.reps ? `${target.reps} reps` : null, target?.durationMin ? `${target.durationMin} min` : null]
     .filter(Boolean)
     .join(' · ');
+
+/** "Dr Meera Nair" -> "Meera": the first name, skipping a title. */
+export const firstName = (name: string) => name.replace(/^(dr|mr|mrs|ms|prof)\.?\s+/i, '').split(/\s+/)[0] ?? name;
 
 /** "Meera Nair" -> "MN" */
 export const initials = (name: string | null | undefined) =>
