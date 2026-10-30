@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, ArrowRight, CheckCircle2, ShieldAlert, Stethoscope, UserPlus } from 'lucide-react';
+import { AlertCircle, ArrowRight, BellOff, CheckCircle2, ShieldAlert, Stethoscope, UserPlus } from 'lucide-react';
 import { alertService, completionService, patientService } from '../../services/apiServices';
 import { errorMessage } from '../../services/api';
 import { qk } from '../../lib/queryClient';
@@ -197,6 +197,7 @@ export const DoctorDashboard = () => {
                   </div>
                   <div className="flex shrink-0 gap-2 self-end sm:self-auto">
                     <Button size="sm" variant="secondary" onClick={() => acknowledge.mutate(alert)} loading={acknowledge.isPending && acknowledge.variables?.id === alert.id}>
+                      <BellOff className="h-4 w-4" aria-hidden="true" />
                       Acknowledge
                     </Button>
                     <Link to={`/doctor/patient/${alert.patient.id}?tab=vitals`} className={buttonClass('secondary', 'sm')}>

@@ -70,6 +70,9 @@ export const describeTarget = (target: Target | null | undefined) =>
     .filter(Boolean)
     .join(' · ');
 
+/** Day 12 of a 28-day programme -> { week: 2, weeks: 4 }. */
+export const weekOf = (day: number, totalDays: number) => ({ week: Math.ceil(day / 7), weeks: Math.ceil(totalDays / 7) });
+
 /** "Dr Meera Nair" -> "Meera": the first name, skipping a title. */
 export const firstName = (name: string) => name.replace(/^(dr|mr|mrs|ms|prof)\.?\s+/i, '').split(/\s+/)[0] ?? name;
 

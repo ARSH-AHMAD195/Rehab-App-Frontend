@@ -5,6 +5,7 @@ import { firebaseAuth } from '../lib/firebase';
 import { authService, isAccountRejection } from '../services/authService';
 import { onUnauthorized } from '../services/api';
 import { setMonitoringUser } from '../lib/monitoring';
+import { clearAllSkips } from '../lib/skips';
 import type { User } from '../types/api';
 
 export type EndReason = 'expired' | 'idle' | null;
@@ -39,6 +40,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setMonitoringUser(null);
       // Never let one user's cached health data be visible to the next person on this device
       queryClient.clear();
+      clearAllSkips();
     },
     [queryClient]
   );

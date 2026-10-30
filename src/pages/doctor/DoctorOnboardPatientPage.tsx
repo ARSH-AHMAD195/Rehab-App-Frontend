@@ -119,6 +119,7 @@ export const DoctorOnboardPatientPage = () => {
             Cancel
           </Button>
           <Button type="submit" loading={enroll.isPending}>
+            <UserPlus className="h-4 w-4" aria-hidden="true" />
             Enroll patient
           </Button>
         </div>

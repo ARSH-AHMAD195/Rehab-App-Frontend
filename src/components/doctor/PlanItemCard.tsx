@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Pencil } from 'lucide-react';
+import { Check, Pencil } from 'lucide-react';
 import { planService } from '../../services/apiServices';
 import { ApiError, errorMessage } from '../../services/api';
 import { qk } from '../../lib/queryClient';
@@ -95,6 +95,7 @@ export const PlanItemCard = ({ patientId, plan, item }: { patientId: string; pla
               Cancel
             </Button>
             <Button type="submit" size="sm" loading={save.isPending}>
+              <Check className="h-4 w-4" aria-hidden="true" />
               Save
             </Button>
           </div>

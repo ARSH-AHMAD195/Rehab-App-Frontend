@@ -1,4 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
+import { Check } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { vitalsService, type ReadingChanges } from '../../services/apiServices';
 import { ApiError } from '../../services/api';
@@ -142,6 +143,7 @@ export const VitalsForm = ({ onSaved }: { onSaved?: () => void }) => {
 
       <div className="flex justify-end">
         <Button type="submit" size="lg" loading={save.isPending} disabled={!changedCount}>
+          <Check className="h-4 w-4" aria-hidden="true" />
           Save {changedCount ? `${changedCount} ${changedCount === 1 ? 'change' : 'changes'}` : ''}
         </Button>
       </div>

@@ -1,7 +1,7 @@
 import { useId, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ClipboardList, Mail, Pencil } from 'lucide-react';
+import { ArrowLeft, BellOff, ClipboardList, Mail, Pencil } from 'lucide-react';
 import { alertService, completionService, patientService, planService, resendInvitation, vitalsService } from '../../services/apiServices';
 import { ApiError, errorMessage } from '../../services/api';
 import { qk } from '../../lib/queryClient';
@@ -34,7 +34,26 @@ const Detail = ({ label, children, className }: { label: string; children: React
   </div>
 );
 
-const EditMedicalModal = ({ patientId, medical, onClose }: { patientId: string; medical: MedicalProfile; onClose: () => void }) => {
+/** Loads the patient's current medical details fresh, then opens the form pre-filled with them. */
+const EditMedicalModal = ({ patientId, onClose }: { patientId: string; onClose: () => void }) => {
+  const medical = useQuery({
+    queryKey: qk.patientPart(patientId, 'medical'),
+    queryFn: () => patientService.getMedical(patientId),
+    // Never edit from a cached copy: always fetch what's saved now
+    refetchOnMount: 'always',
+  });
+
+  if (!medical.isFetchedAfterMount || !medical.data) {
+    return (
+      <Modal title="Edit medical details" onClose={onClose} size="xl">
+        {medical.isError ? <ErrorState error={medical.error} onRetry={() => void medical.refetch()} /> : <PageLoader label="Loading the saved details…" />}
+      </Modal>
+    );
+  }
+  return <EditMedicalForm patientId={patientId} medical={medical.data} onClose={onClose} />;
+};
+
+const EditMedicalForm = ({ patientId, medical, onClose }: { patientId: string; medical: MedicalProfile; onClose: () => void }) => {
   const toast = useToast();
   const queryClient = useQueryClient();
   const form = useFormErrors();
@@ -65,8 +84,13 @@ const EditMedicalModal = ({ patientId, medical, onClose }: { patientId: string; 
     <Modal title="Edit medical details" onClose={onClose} size="xl">
       <form noValidate onSubmit={handleSubmit} onChange={form.onChange} className="space-y-4">
         {form.formError && <Alert tone="error">{form.formError}</Alert>}
-        <MedicalFieldsInputs value={f} onChange={setF} errors={form.errors} />
-        <ModalActions onCancel={onClose} submitLabel="Save" loading={save.isPending} />
+        <p className="text-sm text-slate-600">
+          {medical.updatedAt
+            ? `Showing what’s saved now (last updated ${formatDateTime(medical.updatedAt)}${medical.updatedBy ? ` by a ${medical.updatedBy.role.toLowerCase()}` : ''}). Change only what needs changing.`
+            : 'Nothing saved yet for this patient.'}
+        </p>
+        <MedicalFieldsInputs value={f} onChange={setF} errors={form.errors} examples={false} />
+        <ModalActions onCancel={onClose} submitLabel="Save changes" loading={save.isPending} />
       </form>
     </Modal>
   );
@@ -361,6 +385,7 @@ export const DoctorPatientDetailPage = () => {
                 </div>
                 {a.status === 'OPEN' && (
                   <Button size="sm" variant="secondary" onClick={() => acknowledge.mutate(a.id)} loading={acknowledge.isPending && acknowledge.variables === a.id}>
+                    <BellOff className="h-4 w-4" aria-hidden="true" />
                     Acknowledge
                   </Button>
                 )}
@@ -415,7 +440,7 @@ export const DoctorPatientDetailPage = () => {
       </div>
 
       {modal === 'plan' && plan.data && <PlanEditorModal patientId={patientId} plan={plan.data} onClose={() => setModal(null)} />}
-      {modal === 'medical' && m && <EditMedicalModal patientId={patientId} medical={m} onClose={() => setModal(null)} />}
+      {modal === 'medical' && <EditMedicalModal patientId={patientId} onClose={() => setModal(null)} />}
     </div>
   );
 };

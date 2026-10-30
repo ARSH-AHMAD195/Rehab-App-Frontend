@@ -1,15 +1,14 @@
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { CheckCircle2, History, ListTodo, Play } from 'lucide-react';
+import { CheckCircle2, History, ListTodo } from 'lucide-react';
 import { completionService, planService } from '../../services/apiServices';
 import { qk } from '../../lib/queryClient';
 import { describeDays } from '../../lib/constants';
-import { describeTarget, formatDate, formatDateTime, labelize } from '../../lib/format';
+import { formatDate, formatDateTime } from '../../lib/format';
 import { cn } from '../../lib/cn';
-import { Badge, Button, Card, EmptyState, ErrorState, PageHeader, PageLoader } from '../../components/ui';
-import { ExerciseDetailModal } from '../../components/exercise/ExerciseDetailModal';
-import type { PlanItem } from '../../types/api';
+import { Card, EmptyState, ErrorState, PageHeader, PageLoader } from '../../components/ui';
+import { ExerciseCard } from '../../components/exercise/ExerciseCard';
 
 const TabButton = ({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) => (
   <button
@@ -24,7 +23,6 @@ const TabButton = ({ active, onClick, children }: { active: boolean; onClick: ()
 
 export const PatientExercisesPage = () => {
   const [view, setView] = useState<'plan' | 'history'>('plan');
-  const [detail, setDetail] = useState<PlanItem | null>(null);
 
   const plan = useQuery({ queryKey: qk.myPlan, queryFn: planService.getMine });
   // Last 30 days, newest first (the API's default range)
@@ -96,47 +94,22 @@ export const PatientExercisesPage = () => {
           </p>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {items.map((item) => (
-              <article key={item.itemId} className="flex flex-col justify-between overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xs">
-                <div className="p-6">
-                  <Badge tone="teal">{labelize(item.exercise.category)}</Badge>
-                  <h2 className="mt-3 text-lg font-bold leading-snug text-slate-900">{item.exercise.name}</h2>
-                  {item.exercise.description && <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-slate-700">{item.exercise.description}</p>}
-
-                  <dl className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-slate-50 p-3 text-center">
-                    <div>
-                      <dt className="text-xs font-semibold uppercase text-slate-600">Target</dt>
-                      <dd className="text-sm font-bold text-slate-900">{describeTarget(item.target) || '—'}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs font-semibold uppercase text-slate-600">When</dt>
-                      <dd className="text-sm font-bold text-slate-900">
-                        {describeDays(item.schedule.daysOfWeek)}
-                        {item.schedule.timesPerDay > 1 && `, ${item.schedule.timesPerDay}× a day`}
-                      </dd>
-                    </div>
-                  </dl>
-
-                  {item.notes && (
-                    <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
-                      <strong className="block text-xs font-bold uppercase text-amber-900">Doctor’s note</strong>
-                      {item.notes}
-                    </div>
-                  )}
-                </div>
-
-                <div className="border-t border-slate-100 bg-slate-50 p-4">
-                  <Button variant="secondary" size="sm" className="w-full" onClick={() => setDetail(item)}>
-                    <Play className="h-4 w-4 text-teal-700" aria-hidden="true" />
-                    Instructions & video
-                  </Button>
-                </div>
-              </article>
+              <ExerciseCard
+                key={item.itemId}
+                exercise={item.exercise}
+                target={item.target}
+                notes={item.notes}
+                status={
+                  <span className="shrink-0 text-right text-sm font-semibold text-slate-600">
+                    {describeDays(item.schedule.daysOfWeek)}
+                    {item.schedule.timesPerDay > 1 && <span className="block">{item.schedule.timesPerDay}× a day</span>}
+                  </span>
+                }
+              />
             ))}
           </div>
         </>
       )}
-
-      {detail && <ExerciseDetailModal exercise={detail.exercise} notes={detail.notes} onClose={() => setDetail(null)} />}
     </div>
   );
 };
