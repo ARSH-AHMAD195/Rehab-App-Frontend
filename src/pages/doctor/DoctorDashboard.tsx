@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, ArrowRight, BellOff, CheckCircle2, ShieldAlert, Stethoscope, UserPlus } from 'lucide-react';
 import { alertService, completionService, patientService } from '../../services/apiServices';
 import { errorMessage } from '../../services/api';
 import { qk } from '../../lib/queryClient';
-import { formatDate, formatDateTime } from '../../lib/format';
+import { daysUntil, formatDate, formatDateTime } from '../../lib/format';
 import { cn } from '../../lib/cn';
 import { Alert, Badge, Button, Card, EmptyState, ErrorState, PageLoader, SectionTitle, StatCard, buttonClass } from '../../components/ui';
-import { adherenceOf, completeDays, incompleteDays, missedOnLastDay, ON_TRACK } from '../../lib/compliance';
+import { adherenceOf, completeDaysOf, missed, ON_TRACK } from '../../lib/compliance';
 import { useToast } from '../../components/ui/toast';
 import { AlertSummary } from '../../components/doctor/AlertSummary';
 import type { AlertSeverity, VitalAlert } from '../../types/api';
@@ -22,24 +22,24 @@ const SEVERITY_STYLES: Record<AlertSeverity, [string, string, string]> = {
 };
 
 const RECENT_PATIENTS = 6;
-// ponytail: compliance is one request per patient (no caseload endpoint yet), so only the first 50 patients are counted
-const CASELOAD_LIMIT = 50;
+// Each caseload read is audited once per patient, so don't refetch on every window focus
+const CASELOAD_STALE_MS = 5 * 60_000;
+
+const relativeDays = (iso: string) => {
+  const days = -(daysUntil(iso) ?? 0);
+  return days <= 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`;
+};
 
 export const DoctorDashboard = () => {
   const toast = useToast();
   const queryClient = useQueryClient();
   const [severity, setSeverity] = useState<(typeof SEVERITIES)[number]>('ALL');
 
-  const patients = useQuery({ queryKey: qk.patients({ limit: CASELOAD_LIMIT }), queryFn: () => patientService.list({ limit: CASELOAD_LIMIT }) });
-  const week = completeDays(7);
-  const compliance = useQueries({
-    queries: (patients.data?.data ?? []).map((p) => ({
-      queryKey: qk.patientPart(p.id, 'compliance', 'week'),
-      queryFn: () => completionService.getCompliance(p.id, week),
-      // Each read is audited and costs a request, so don't refetch on every focus
-      staleTime: 5 * 60_000,
-    })),
-  });
+  const patients = useQuery({ queryKey: qk.patients({ limit: RECENT_PATIENTS }), queryFn: () => patientService.list({ limit: RECENT_PATIENTS }) });
+  // Each range ends on the patient's today; completeDaysOf() takes today away:
+  // 8 days -> the last 7 complete days, 2 days -> yesterday
+  const week = useQuery({ queryKey: ['caseload', 8], queryFn: () => completionService.getCaseload(8), staleTime: CASELOAD_STALE_MS });
+  const yesterday = useQuery({ queryKey: ['caseload', 2], queryFn: () => completionService.getCaseload(2), staleTime: CASELOAD_STALE_MS });
   const alerts = useQuery({ queryKey: qk.alerts({ status: 'OPEN' }), queryFn: () => alertService.list({ status: 'OPEN', limit: 100 }), refetchInterval: 60_000 });
 
   const acknowledge = useMutation({
@@ -61,13 +61,12 @@ export const DoctorDashboard = () => {
   const count = (s: AlertSeverity) => alertList.filter((a) => a.severity === s).length;
   const visibleAlerts = alertList.filter((a) => severity === 'ALL' || a.severity === severity);
 
-  const caseload = patients.data.data;
-  const loaded = caseload.flatMap((p, i) => (compliance[i]?.data ? [{ patient: p, c: compliance[i]!.data! }] : []));
-  const complianceLoading = compliance.some((q) => q.isPending);
-  const countOf = (a: ReturnType<typeof adherenceOf>) => (complianceLoading ? '—' : loaded.filter((x) => adherenceOf(x.c) === a).length);
-  const missed = loaded.flatMap(({ patient, c }) => {
-    const day = missedOnLastDay(c);
-    return day ? [{ patient, day, incomplete: incompleteDays(c) }] : [];
+  const recent = patients.data.data;
+  const caseload = week.data?.data ?? [];
+  const countOf = (a: ReturnType<typeof adherenceOf>) => (week.data ? caseload.filter((row) => adherenceOf(completeDaysOf(row)) === a).length : '—');
+  const missedYesterday = (yesterday.data?.data ?? []).flatMap((row) => {
+    const day = completeDaysOf(row);
+    return missed(day) ? [{ row, day }] : [];
   });
 
   return (
@@ -91,39 +90,38 @@ export const DoctorDashboard = () => {
 
       <section aria-label="Routine adherence">
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <StatCard label="Patients" value={patients.data.nextCursor ? `${caseload.length}+` : caseload.length} hint="Linked to you" />
+          <StatCard label="Patients" value={week.data ? caseload.length : '—'} hint="Active, linked to you" />
           <StatCard label="Following their routine" value={countOf('on-track')} hint={`${Math.round(ON_TRACK * 100)}%+ of planned exercises done`} tone="teal" />
           <StatCard label="Falling behind" value={countOf('behind')} hint={`Under ${Math.round(ON_TRACK * 100)}% done`} />
           <StatCard label="No plan yet" value={countOf('no-plan')} hint="Nothing planned this week" />
         </div>
-        <p className="mt-2 text-xs text-slate-600">
-          Based on the last 7 complete days{patients.data.nextCursor ? `, first ${CASELOAD_LIMIT} patients` : ''}.
-        </p>
+        <p className="mt-2 text-xs text-slate-600">{week.isError ? `Couldn’t load routine numbers: ${errorMessage(week.error)}` : 'Based on the last 7 complete days. Skipped exercises count as not done.'}</p>
       </section>
 
       <Card className="space-y-4">
         <SectionTitle title="Missed exercises yesterday" description="Patients who didn’t do everything planned for them" />
-        {complianceLoading ? (
+        {yesterday.isPending ? (
           <PageLoader label="Checking exercise routines…" />
-        ) : missed.length === 0 ? (
+        ) : yesterday.isError ? (
+          <Alert tone="error">{errorMessage(yesterday.error)}</Alert>
+        ) : missedYesterday.length === 0 ? (
           <p className="flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-sm text-emerald-900">
             <CheckCircle2 className="h-5 w-5 text-emerald-700" aria-hidden="true" />
             Everyone did their planned exercises yesterday.
           </p>
         ) : (
           <ul className="space-y-2.5">
-            {missed.map(({ patient, day, incomplete }) => (
+            {missedYesterday.map(({ row: { patient, lastActivityAt }, day }) => (
               <li key={patient.id} className="flex flex-col justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 sm:flex-row sm:items-center">
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="text-base font-bold text-slate-900">{patient.name}</span>
                     <Badge tone={day.done === 0 ? 'rose' : 'amber'}>
                       {day.done} of {day.planned} done
                     </Badge>
+                    {day.skipped > 0 && <Badge tone="slate">{day.skipped} skipped</Badge>}
                   </div>
-                  <p className="mt-0.5 text-sm text-slate-700">
-                    {incomplete > 1 ? `${incomplete} of the last 7 days incomplete` : 'First missed day this week'}
-                  </p>
+                  <p className="mt-0.5 text-sm text-slate-700">{lastActivityAt ? `Last active ${relativeDays(lastActivityAt)}` : 'Hasn’t ticked off any exercise yet'}</p>
                 </div>
                 <Link to={`/doctor/patient/${patient.id}?tab=exercises`} className={buttonClass('secondary', 'sm', 'shrink-0 self-end sm:self-auto')}>
                   Exercises<span className="sr-only"> for {patient.name}</span>
@@ -222,7 +220,7 @@ export const DoctorDashboard = () => {
             </Link>
           }
         />
-        {caseload.length === 0 ? (
+        {recent.length === 0 ? (
           <EmptyState>
             No patients linked to you yet.{' '}
             <Link to="/doctor/onboard-patient" className="font-semibold text-teal-800 underline">
@@ -231,7 +229,7 @@ export const DoctorDashboard = () => {
           </EmptyState>
         ) : (
           <ul className="grid gap-4 md:grid-cols-2">
-            {caseload.slice(0, RECENT_PATIENTS).map((p) => (
+            {recent.map((p) => (
               <li key={p.id} className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50 p-5">
                 <div>
                   <h3 className="text-base font-bold text-slate-900">{p.name}</h3>

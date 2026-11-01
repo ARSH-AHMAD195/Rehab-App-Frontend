@@ -4,11 +4,11 @@ import { Plus, Stethoscope } from 'lucide-react';
 import { useSignedInUser } from '../../context/AuthContext';
 import { completionService, profileService, vitalsService } from '../../services/apiServices';
 import { qk } from '../../lib/queryClient';
-import { daysUntil, firstName, formatDate, formatReading, fromDateKey } from '../../lib/format';
-import { useSkips } from '../../lib/skips';
+import { firstName, formatDate, formatReading, fromDateKey } from '../../lib/format';
 import { Card, EmptyState, ErrorState, PageLoader, SectionTitle, buttonClass } from '../../components/ui';
 import { TodayExerciseCard } from '../../components/exercise/TodayExerciseCard';
 import { ProgramProgressCard } from '../../components/patient/ProgramProgressCard';
+import { programmeFor } from '../../lib/programme';
 import type { Checklist, ChecklistItem, Reading, VitalType } from '../../types/api';
 
 const TILES: { type: VitalType; label: string }[] = [
@@ -40,13 +40,12 @@ const VitalTile = ({ label, reading }: { label: string; reading?: Reading }) => 
 );
 
 /** Today's planned exercises as cards: mark done, or say you couldn't. */
-const TodayExercises = ({ patientId, checklist }: { patientId: string; checklist: Checklist }) => {
-  const { skips, skip, unskip } = useSkips(patientId, checklist.date);
+const TodayExercises = ({ checklist }: { checklist: Checklist }) => {
   const { items, doneCount, plannedCount, date } = checklist;
 
   const progress = plannedCount ? Math.round((doneCount / plannedCount) * 100) : 0;
   // To do first, then skipped, then done
-  const rank = (i: ChecklistItem) => (i.status === 'DONE' ? 2 : skips[i.itemId] ? 1 : 0);
+  const rank = (i: ChecklistItem) => (i.status === 'DONE' ? 2 : i.status === 'SKIPPED' ? 1 : 0);
   const ordered = [...items].sort((a, b) => rank(a) - rank(b));
 
   return (
@@ -77,9 +76,6 @@ const TodayExercises = ({ patientId, checklist }: { patientId: string; checklist
               key={item.itemId}
               item={item}
               date={date}
-              skipped={skips[item.itemId]}
-              onSkip={(reason) => skip(item.itemId, reason)}
-              onUnskip={() => unskip(item.itemId)}
             />
           ))}
         </div>
@@ -100,12 +96,12 @@ export const PatientDashboard = () => {
   if (checklist.isError) return <ErrorState error={checklist.error} onRetry={() => void checklist.refetch()} />;
 
   const surgeryDate = medical.data?.plannedSurgeryDate;
-  const days = daysUntil(surgeryDate);
-  // Programme progress: day 1 is the day they were enrolled, the last day is surgery day
-  const enrolled = profile.data?.createdAt;
-  const totalDays = enrolled && surgeryDate ? daysUntil(surgeryDate, new Date(enrolled)) : null;
-  const dayNumber = enrolled ? -(daysUntil(enrolled) ?? 0) + 1 : null;
-  const showProgramme = totalDays !== null && totalDays > 0 && dayNumber !== null && days !== null && days >= 0;
+  const programme = programmeFor({
+    startDate: medical.data?.programmeStartDate,
+    lengthDays: medical.data?.programmeLengthDays,
+    surgeryDate,
+    enrolledAt: profile.data?.createdAt,
+  });
   const doctors = profile.data?.doctors ?? [];
 
   return (
@@ -124,13 +120,19 @@ export const PatientDashboard = () => {
       </header>
 
       {/* 30px above Today’s exercises, as designed (24px from the page’s spacing + 6) */}
-      {showProgramme && (
+      {programme && (
         <div className="pb-1.5">
-          <ProgramProgressCard currentDay={dayNumber} totalDays={totalDays} surgeryDate={surgeryDate ? fromDateKey(surgeryDate) : null} />
+          {programme.started ? (
+            <ProgramProgressCard currentDay={programme.currentDay} totalDays={programme.totalDays} surgeryDate={surgeryDate ? fromDateKey(surgeryDate) : null} />
+          ) : (
+            <p className="rounded-2xl border border-ffs-border bg-ffs-surface p-[18px] text-[17px] text-ffs-ink">
+              Your {programme.totalDays}-day programme starts on <strong>{formatDate(programme.start, { weekday: 'long', day: 'numeric', month: 'long' })}</strong>.
+            </p>
+          )}
         </div>
       )}
 
-      <TodayExercises patientId={user.id} checklist={checklist.data} />
+      <TodayExercises checklist={checklist.data} />
 
       <section aria-labelledby="latest-vitals">
         <div className="mb-3 flex items-center justify-between">

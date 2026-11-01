@@ -1,5 +1,6 @@
 import { api, type QueryParams } from './api';
 import type {
+  CaseloadRow,
   Category,
   Checklist,
   Completion,
@@ -125,7 +126,8 @@ export const exerciseService = {
   deactivateCategory: (id: Id) => api.delete<Category>(`/exercise-categories/${id}`),
 
   /** Admin/doctor: the library. Patient: only the exercises in their plan. */
-  list: (params: Paged & { category?: string; active?: boolean; q?: string } = {}) => api.get<Page<Exercise>>('/exercises', params as QueryParams),
+  /** `active`: 'true' (default) = active only, 'false' = deactivated only, 'all' = both. */
+  list: (params: Paged & { category?: string; active?: 'true' | 'false' | 'all'; q?: string } = {}) => api.get<Page<Exercise>>('/exercises', params as QueryParams),
   get: (id: Id) => api.get<Exercise>(`/exercises/${id}`),
   create: (data: ExerciseInput & { name: string; categoryId: Id }) => api.post<Exercise>('/exercises', data),
   update: (id: Id, data: ExerciseInput) => api.patch<Exercise>(`/exercises/${id}`, data),
@@ -142,11 +144,17 @@ export const planService = {
 
 export const completionService = {
   getMyChecklist: () => api.get<Checklist>('/patients/me/exercise-checklist'),
-  complete: (data: { itemId: string; date: string; details?: { durationMin?: number; note?: string } | null }, idempotencyKey = crypto.randomUUID()) =>
+  /** A tick, or a skip for the rest of the day: `{ status: 'SKIPPED', reason }` (no details). Undo either with `undo`. */
+  complete: (
+    data: { itemId: string; date: string } & ({ status?: 'DONE'; details?: { durationMin?: number; note?: string } | null } | { status: 'SKIPPED'; reason: string }),
+    idempotencyKey = crypto.randomUUID()
+  ) =>
     api.post<Completion>('/exercise-completions', data, idempotencyKey),
   undo: (completionId: Id) => api.delete<null>(`/exercise-completions/${completionId}`),
   getMine: (params: Range & Paged = {}) => api.get<Page<Completion>>('/patients/me/exercise-completions', params),
   getChecklist: (patientId: Id, date?: string) => api.get<Checklist>(`/patients/${patientId}/exercise-checklist`, { date }),
   getHistory: (patientId: Id, params: Range & Paged = {}) => api.get<Page<Completion>>(`/patients/${patientId}/exercise-completions`, params),
   getCompliance: (patientId: Id, params: Range = {}) => api.get<Compliance>(`/patients/${patientId}/exercise-compliance`, params),
+  /** Every linked patient's counts over the last `days` days (1-90), each ending on that patient's today. */
+  getCaseload: (days: number) => api.get<{ days: number; data: CaseloadRow[] }>('/doctor/exercise-compliance', { days }),
 };

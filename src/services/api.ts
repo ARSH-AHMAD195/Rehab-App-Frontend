@@ -10,8 +10,8 @@ const AUTH_API_URL = base(import.meta.env.VITE_AUTH_API_URL);
 const HEALTH_API_URL = base(import.meta.env.VITE_HEALTH_API_URL);
 const EXERCISE_API_URL = base(import.meta.env.VITE_EXERCISE_API_URL);
 
-const HEALTH_PATHS = /^\/(vital-types|me\/vitals|doctor\/|admin\/(alert-thresholds|vital-types))/;
-const EXERCISE_PATHS = /^\/(exercise-categories|exercises|exercise-completions|patients\/[^/]+\/exercise-)/;
+const HEALTH_PATHS = /^\/(vital-types|me\/vitals|doctor\/(alerts|patients)|admin\/(alert-thresholds|vital-types))/;
+const EXERCISE_PATHS = /^\/(exercise-categories|exercises|exercise-completions|patients\/[^/]+\/exercise-|doctor\/exercise-)/;
 
 /** Which API serves a path. Everything not vitals or exercises belongs to Auth. */
 export const apiBaseFor = (path: string) =>

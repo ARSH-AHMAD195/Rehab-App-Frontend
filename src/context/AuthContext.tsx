@@ -5,7 +5,6 @@ import { firebaseAuth } from '../lib/firebase';
 import { authService, isAccountRejection } from '../services/authService';
 import { onUnauthorized } from '../services/api';
 import { setMonitoringUser } from '../lib/monitoring';
-import { clearAllSkips } from '../lib/skips';
 import type { User } from '../types/api';
 
 export type EndReason = 'expired' | 'idle' | null;
@@ -17,6 +16,8 @@ interface AuthValue {
   endReason: EndReason;
   login: (credentials: { email: string; password: string }) => Promise<User>;
   logout: (reason?: EndReason) => Promise<void>;
+  /** Asks again whether the email is verified, after the user clicked the link. */
+  recheckVerification: () => Promise<User>;
 }
 
 const AuthContext = createContext<AuthValue | null>(null);
@@ -40,7 +41,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setMonitoringUser(null);
       // Never let one user's cached health data be visible to the next person on this device
       queryClient.clear();
-      clearAllSkips();
     },
     [queryClient]
   );
@@ -93,7 +93,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     [signedOut]
   );
 
-  const value = useMemo(() => ({ user, loading, endReason, login, logout }), [user, loading, endReason, login, logout]);
+  const recheckVerification = useCallback(async () => {
+    const next = await authService.recheckVerification();
+    signedIn(next);
+    return next;
+  }, [signedIn]);
+
+  const value = useMemo(() => ({ user, loading, endReason, login, logout, recheckVerification }), [user, loading, endReason, login, logout, recheckVerification]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

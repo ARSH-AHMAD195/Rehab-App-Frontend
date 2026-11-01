@@ -42,7 +42,7 @@ export const PlanEditorModal = ({ patientId, plan, onClose }: { patientId: strin
   const [rows, setRows] = useState<Row[]>(() => toRows(plan));
   const [search, setSearch] = useState('');
 
-  const library = useQuery({ queryKey: qk.library({ active: true, limit: 100 }), queryFn: () => exerciseService.list({ active: true, limit: 100 }) });
+  const library = useQuery({ queryKey: qk.library({ active: 'true', limit: 100 }), queryFn: () => exerciseService.list({ active: 'true', limit: 100 }) });
   const exercises = library.data?.data ?? [];
   // Exercises already in the plan stay pickable even if an admin has since deactivated them
   const options = [...exercises, ...plan.items.map((i) => i.exercise).filter((e) => !exercises.some((x) => x.id === e.id))];

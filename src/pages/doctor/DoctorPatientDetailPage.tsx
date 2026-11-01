@@ -180,6 +180,13 @@ export const DoctorPatientDetailPage = () => {
             <dl className="grid grid-cols-2 gap-4 text-sm">
               <Detail label="Planned surgery">{m!.plannedSurgery}</Detail>
               <Detail label="Surgery date">{m!.plannedSurgeryDate && formatDate(m!.plannedSurgeryDate)}</Detail>
+              <Detail label="Programme">
+                {m!.programmeStartDate
+                  ? `From ${formatDate(m!.programmeStartDate)}${m!.programmeLengthDays ? `, ${m!.programmeLengthDays} days` : ', until surgery'}`
+                  : m!.programmeLengthDays
+                    ? `${m!.programmeLengthDays} days`
+                    : null}
+              </Detail>
               <Detail label="Diagnosis" className="col-span-2">
                 {m!.diagnosis}
               </Detail>
@@ -295,9 +302,13 @@ export const DoctorPatientDetailPage = () => {
                 {checklist.data.items.map((i) => (
                   <li key={i.itemId} className="flex items-center justify-between py-2">
                     <span className="font-semibold text-slate-900">{i.exercise.name}</span>
-                    <Badge tone={i.status === 'DONE' ? 'emerald' : i.status === 'PARTLY_DONE' ? 'amber' : 'slate'}>
-                      {i.doneCount}/{i.timesPerDay}
-                    </Badge>
+                    {i.status === 'SKIPPED' ? (
+                      <Badge tone="amber">Skipped{i.skip ? ` · ${i.skip.reason}` : ''}</Badge>
+                    ) : (
+                      <Badge tone={i.status === 'DONE' ? 'emerald' : i.status === 'PARTLY_DONE' ? 'amber' : 'slate'}>
+                        {i.doneCount}/{i.timesPerDay}
+                      </Badge>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -305,7 +316,7 @@ export const DoctorPatientDetailPage = () => {
           </Card>
 
           <Card>
-            <SectionTitle title="Last 7 days" as="h3" description={compliance.data && `${compliance.data.done} of ${compliance.data.planned} planned exercises done`} />
+            <SectionTitle title="Last 7 days" as="h3" description={compliance.data && `${compliance.data.done} of ${compliance.data.planned} planned exercises done${compliance.data.skipped ? `, ${compliance.data.skipped} skipped` : ''}`} />
             {compliance.isPending ? (
               <PageLoader label="Loading…" />
             ) : compliance.isError ? (
@@ -319,6 +330,7 @@ export const DoctorPatientDetailPage = () => {
                     <span className="font-semibold text-slate-900">{e.name}</span>
                     <span className="text-slate-700">
                       {e.done} / {e.planned}
+                      {e.skipped > 0 && <span className="text-amber-800"> · {e.skipped} skipped</span>}
                     </span>
                   </li>
                 ))}
@@ -353,9 +365,12 @@ export const DoctorPatientDetailPage = () => {
             {missedDays.map((d) => (
               <li key={d.date} className="flex items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3">
                 <span className="font-semibold text-slate-900">{formatDate(d.date, { weekday: 'long', month: 'short', day: 'numeric' })}</span>
-                <Badge tone={d.done === 0 ? 'rose' : 'amber'}>
-                  {d.done} of {d.planned} done
-                </Badge>
+                <span className="flex flex-wrap gap-1.5">
+                  <Badge tone={d.done === 0 ? 'rose' : 'amber'}>
+                    {d.done} of {d.planned} done
+                  </Badge>
+                  {d.skipped > 0 && <Badge tone="slate">{d.skipped} skipped</Badge>}
+                </span>
               </li>
             ))}
           </ul>

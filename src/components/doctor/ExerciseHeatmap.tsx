@@ -60,7 +60,7 @@ export const ExerciseHeatmap = ({ patientId }: { patientId: string }) => {
             return (
               <span
                 key={date}
-                title={`${formatDate(date, { weekday: 'short', month: 'short', day: 'numeric' })}: ${d?.planned ? `${d.done} of ${d.planned} done` : 'nothing planned'}`}
+                title={`${formatDate(date, { weekday: 'short', month: 'short', day: 'numeric' })}: ${d?.planned ? `${d.done} of ${d.planned} done${d.skipped ? `, ${d.skipped} skipped` : ''}` : 'nothing planned'}`}
                 className={cn('h-3.5 w-3.5 rounded-sm', cellTone(d), date === today && 'ring-2 ring-teal-700 ring-offset-1')}
               />
             );

@@ -14,17 +14,10 @@ import type { ChecklistItem } from '../../types/api';
 export const TodayExerciseCard = ({
   item,
   date,
-  skipped,
-  onSkip,
-  onUnskip,
   status,
 }: {
   item: ChecklistItem;
   date: string;
-  /** The reason, when the patient skipped it today */
-  skipped?: string;
-  onSkip: (reason: string) => void;
-  onUnskip: () => void;
   /** Overrides the top-right label, e.g. the plan's days on My exercises */
   status?: React.ReactNode;
 }) => {
@@ -32,6 +25,8 @@ export const TodayExerciseCard = ({
   const queryClient = useQueryClient();
   const [modal, setModal] = useState<'complete' | 'skip' | null>(null);
   const done = item.status === 'DONE';
+  // A skip is a completion with status SKIPPED; undoing it takes its id, like a tick
+  const skip = item.status === 'SKIPPED' ? item.skip : null;
   const lastTick = item.completions.at(-1);
 
   const undo = useMutation({
@@ -58,13 +53,13 @@ export const TodayExerciseCard = ({
 
   return (
     <ExerciseCard exercise={item.exercise} target={item.target} notes={item.notes} status={done ? <DonePill /> : (status ?? timesLabel)}>
-      {skipped && !done ? (
+      {skip ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-950">
           <span className="flex items-center gap-1.5 font-semibold">
             <XCircle className="h-4 w-4 text-amber-700" aria-hidden="true" />
-            Skipped today · {skipped}
+            Skipped today · {skip.reason}
           </span>
-          <button type="button" onClick={onUnskip} className="font-semibold text-teal-800 underline">
+          <button type="button" onClick={() => undo.mutate(skip.id)} disabled={undo.isPending} className="font-semibold text-teal-800 underline disabled:opacity-60">
             Undo<span className="sr-only"> skip for {item.exercise.name}</span>
           </button>
         </div>
@@ -90,7 +85,7 @@ export const TodayExerciseCard = ({
       )}
 
       {modal === 'complete' && <CompleteExerciseModal item={item} date={date} onClose={() => setModal(null)} />}
-      {modal === 'skip' && <SkipExerciseModal name={item.exercise.name} onSkip={onSkip} onClose={() => setModal(null)} />}
+      {modal === 'skip' && <SkipExerciseModal item={item} date={date} onClose={() => setModal(null)} />}
     </ExerciseCard>
   );
 };
