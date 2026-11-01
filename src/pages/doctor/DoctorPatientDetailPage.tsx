@@ -1,15 +1,14 @@
 import { useId, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ClipboardList, Mail, Pencil } from 'lucide-react';
+import { ArrowLeft, BellOff, ClipboardList, Mail, Pencil } from 'lucide-react';
 import { alertService, completionService, patientService, planService, resendInvitation, vitalsService } from '../../services/apiServices';
 import { ApiError, errorMessage } from '../../services/api';
 import { qk } from '../../lib/queryClient';
-import { describeDays } from '../../lib/constants';
 import { useFormErrors } from '../../lib/forms';
 import { useVitalLabel } from '../../lib/vitals';
 import { formToMedical, medicalChanges, medicalToForm, type MedicalForm } from '../../lib/medical';
-import { describeTarget, formatDate, formatDateTime, formatReading, initials, labelize } from '../../lib/format';
+import { formatDate, formatDateTime, formatReading, initials, labelize } from '../../lib/format';
 import { Alert, Badge, Button, Card, EmptyState, ErrorState, Modal, ModalActions, PageLoader, SectionTitle } from '../../components/ui';
 import { panelId, tabId, Tabs } from '../../components/ui/Tabs';
 import { useToast } from '../../components/ui/toast';
@@ -19,6 +18,10 @@ import { AlertSummary } from '../../components/doctor/AlertSummary';
 import { MedicalFieldsInputs } from '../../components/doctor/MedicalFieldsInputs';
 import { PlanEditorModal } from '../../components/doctor/PlanEditorModal';
 import { SurgeryCountdown } from '../../components/doctor/SurgeryCountdown';
+import { PlanItemCard } from '../../components/doctor/PlanItemCard';
+import { ExerciseHeatmap } from '../../components/doctor/ExerciseHeatmap';
+import { ExerciseTimeline } from '../../components/doctor/ExerciseTimeline';
+import { completeDays } from '../../lib/compliance';
 import type { MedicalProfile } from '../../types/api';
 
 const TAB_IDS = ['overview', 'vitals', 'exercises', 'alerts'] as const;
@@ -31,7 +34,26 @@ const Detail = ({ label, children, className }: { label: string; children: React
   </div>
 );
 
-const EditMedicalModal = ({ patientId, medical, onClose }: { patientId: string; medical: MedicalProfile; onClose: () => void }) => {
+/** Loads the patient's current medical details fresh, then opens the form pre-filled with them. */
+const EditMedicalModal = ({ patientId, onClose }: { patientId: string; onClose: () => void }) => {
+  const medical = useQuery({
+    queryKey: qk.patientPart(patientId, 'medical'),
+    queryFn: () => patientService.getMedical(patientId),
+    // Never edit from a cached copy: always fetch what's saved now
+    refetchOnMount: 'always',
+  });
+
+  if (!medical.isFetchedAfterMount || !medical.data) {
+    return (
+      <Modal title="Edit medical details" onClose={onClose} size="xl">
+        {medical.isError ? <ErrorState error={medical.error} onRetry={() => void medical.refetch()} /> : <PageLoader label="Loading the saved details…" />}
+      </Modal>
+    );
+  }
+  return <EditMedicalForm patientId={patientId} medical={medical.data} onClose={onClose} />;
+};
+
+const EditMedicalForm = ({ patientId, medical, onClose }: { patientId: string; medical: MedicalProfile; onClose: () => void }) => {
   const toast = useToast();
   const queryClient = useQueryClient();
   const form = useFormErrors();
@@ -62,8 +84,13 @@ const EditMedicalModal = ({ patientId, medical, onClose }: { patientId: string; 
     <Modal title="Edit medical details" onClose={onClose} size="xl">
       <form noValidate onSubmit={handleSubmit} onChange={form.onChange} className="space-y-4">
         {form.formError && <Alert tone="error">{form.formError}</Alert>}
-        <MedicalFieldsInputs value={f} onChange={setF} errors={form.errors} />
-        <ModalActions onCancel={onClose} submitLabel="Save" loading={save.isPending} />
+        <p className="text-sm text-slate-600">
+          {medical.updatedAt
+            ? `Showing what’s saved now (last updated ${formatDateTime(medical.updatedAt)}${medical.updatedBy ? ` by a ${medical.updatedBy.role.toLowerCase()}` : ''}). Change only what needs changing.`
+            : 'Nothing saved yet for this patient.'}
+        </p>
+        <MedicalFieldsInputs value={f} onChange={setF} errors={form.errors} examples={false} />
+        <ModalActions onCancel={onClose} submitLabel="Save changes" loading={save.isPending} />
       </form>
     </Modal>
   );
@@ -90,8 +117,8 @@ export const DoctorPatientDetailPage = () => {
   const today = useQuery({ queryKey: qk.patientPart(patientId, 'today'), queryFn: () => vitalsService.getPatientToday(patientId), enabled: tab === 'vitals' });
   const logs = useQuery({ queryKey: qk.patientPart(patientId, 'logs'), queryFn: () => vitalsService.getPatientLogs(patientId, { limit: 30 }), enabled: tab === 'vitals' });
   const checklist = useQuery({ queryKey: qk.patientPart(patientId, 'checklist'), queryFn: () => completionService.getChecklist(patientId), enabled: tab === 'exercises' });
-  const compliance = useQuery({ queryKey: qk.patientPart(patientId, 'compliance'), queryFn: () => completionService.getCompliance(patientId), enabled: tab === 'exercises' });
-  const history = useQuery({ queryKey: qk.patientPart(patientId, 'history'), queryFn: () => completionService.getHistory(patientId, { limit: 20 }), enabled: tab === 'exercises' });
+  // Last 7 complete days: today isn't over, so it can't count as missed (same key as the dashboard's)
+  const compliance = useQuery({ queryKey: qk.patientPart(patientId, 'compliance', 'week'), queryFn: () => completionService.getCompliance(patientId, completeDays(7)) });
 
   const invite = useMutation({
     mutationFn: () => resendInvitation(patientId),
@@ -127,6 +154,7 @@ export const DoctorPatientDetailPage = () => {
   const p = patient.data;
   const m = medical.data;
   const openAlerts = (alerts.data?.data ?? []).filter((a) => a.status === 'OPEN');
+  const missedDays = [...(compliance.data?.byDay ?? [])].filter((d) => d.planned > d.done).sort((a, b) => b.date.localeCompare(a.date));
 
   const panels: Record<TabKey, ReactNode> = {
     overview: (
@@ -247,16 +275,7 @@ export const DoctorPatientDetailPage = () => {
           ) : (
             <ul className="grid gap-3 md:grid-cols-2">
               {plan.data.items.map((i) => (
-                <li key={i.itemId} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-bold text-slate-900">{i.exercise.name}</span>
-                    {!i.exercise.active && <Badge tone="rose">Deactivated</Badge>}
-                  </div>
-                  <p className="mt-1.5 text-slate-700">
-                    {[describeDays(i.schedule.daysOfWeek), i.schedule.timesPerDay > 1 ? `${i.schedule.timesPerDay}× a day` : null, describeTarget(i.target)].filter(Boolean).join(' · ')}
-                  </p>
-                  {i.notes && <p className="mt-2 rounded-lg border border-teal-200 bg-teal-50 p-2 text-teal-950">{i.notes}</p>}
-                </li>
+                <PlanItemCard key={i.itemId} patientId={patientId} plan={plan.data} item={i} />
               ))}
             </ul>
           )}
@@ -286,7 +305,7 @@ export const DoctorPatientDetailPage = () => {
           </Card>
 
           <Card>
-            <SectionTitle title="Compliance, last 7 days" as="h3" description={compliance.data && `${compliance.data.done} of ${compliance.data.planned} planned exercises done`} />
+            <SectionTitle title="Last 7 days" as="h3" description={compliance.data && `${compliance.data.done} of ${compliance.data.planned} planned exercises done`} />
             {compliance.isPending ? (
               <PageLoader label="Loading…" />
             ) : compliance.isError ? (
@@ -309,33 +328,41 @@ export const DoctorPatientDetailPage = () => {
         </div>
 
         <Card>
-          <SectionTitle title="Recent completions" as="h3" />
-          {history.isPending ? (
-            <PageLoader label="Loading…" />
-          ) : history.isError ? (
-            <Alert tone="error">{errorMessage(history.error)}</Alert>
-          ) : history.data.data.length === 0 ? (
-            <EmptyState>No exercises ticked off in the last 30 days.</EmptyState>
-          ) : (
-            <ul className="divide-y divide-slate-100 text-sm">
-              {history.data.data.map((c) => (
-                <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
-                  <span className="font-semibold text-slate-900">{c.exercise.name}</span>
-                  <span className="text-slate-600">
-                    {formatDateTime(c.completedAt)}
-                    {c.details?.durationMin ? ` · ${c.details.durationMin} min` : ''}
-                    {c.details?.note ? ` · “${c.details.note}”` : ''}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
+          <SectionTitle title="Last 90 days" description="Each square is a day" as="h3" />
+          <ExerciseHeatmap patientId={patientId} />
+        </Card>
+
+        <Card>
+          <SectionTitle title="Daily timeline" description="The last 14 days, newest first" as="h3" />
+          <ExerciseTimeline patientId={patientId} />
         </Card>
       </div>
     ),
     alerts: (
+      <div className="space-y-6">
       <Card>
-        <SectionTitle title="Alerts" as="h3" description="Newest first" />
+        <SectionTitle title="Missed exercises" as="h3" description="Days in the last week with planned exercises not done" />
+        {compliance.isPending ? (
+          <PageLoader label="Loading…" />
+        ) : compliance.isError ? (
+          <Alert tone="error">{errorMessage(compliance.error)}</Alert>
+        ) : missedDays.length === 0 ? (
+          <EmptyState>{compliance.data.planned ? 'No missed exercises in the last 7 days.' : 'Nothing was planned in the last 7 days.'}</EmptyState>
+        ) : (
+          <ul className="space-y-2 text-sm">
+            {missedDays.map((d) => (
+              <li key={d.date} className="flex items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <span className="font-semibold text-slate-900">{formatDate(d.date, { weekday: 'long', month: 'short', day: 'numeric' })}</span>
+                <Badge tone={d.done === 0 ? 'rose' : 'amber'}>
+                  {d.done} of {d.planned} done
+                </Badge>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+      <Card>
+        <SectionTitle title="Vital alerts" as="h3" description="Newest first" />
         {alerts.isPending ? (
           <PageLoader label="Loading alerts…" />
         ) : alerts.isError ? (
@@ -358,6 +385,7 @@ export const DoctorPatientDetailPage = () => {
                 </div>
                 {a.status === 'OPEN' && (
                   <Button size="sm" variant="secondary" onClick={() => acknowledge.mutate(a.id)} loading={acknowledge.isPending && acknowledge.variables === a.id}>
+                    <BellOff className="h-4 w-4" aria-hidden="true" />
                     Acknowledge
                   </Button>
                 )}
@@ -366,6 +394,7 @@ export const DoctorPatientDetailPage = () => {
           </ul>
         )}
       </Card>
+      </div>
     ),
   };
 
@@ -402,7 +431,7 @@ export const DoctorPatientDetailPage = () => {
           { id: 'overview', label: 'Overview' },
           { id: 'vitals', label: 'Vitals' },
           { id: 'exercises', label: 'Exercises', count: plan.data?.items.length },
-          { id: 'alerts', label: 'Alerts', count: alerts.data ? openAlerts.length : undefined },
+          { id: 'alerts', label: 'Alerts', count: alerts.data ? openAlerts.length + missedDays.length : undefined },
         ]}
       />
 
@@ -411,7 +440,7 @@ export const DoctorPatientDetailPage = () => {
       </div>
 
       {modal === 'plan' && plan.data && <PlanEditorModal patientId={patientId} plan={plan.data} onClose={() => setModal(null)} />}
-      {modal === 'medical' && m && <EditMedicalModal patientId={patientId} medical={m} onClose={() => setModal(null)} />}
+      {modal === 'medical' && <EditMedicalModal patientId={patientId} onClose={() => setModal(null)} />}
     </div>
   );
 };

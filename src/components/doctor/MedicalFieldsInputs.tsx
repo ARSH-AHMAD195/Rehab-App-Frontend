@@ -6,7 +6,19 @@ import { BLOOD_GROUPS, SEXES, SMOKING_STATUSES } from '../../types/api';
 import type { MedicalForm } from '../../lib/medical';
 
 /** The medical profile fields. Input names match the API's error `field` paths. */
-export const MedicalFieldsInputs = ({ value: f, onChange, errors }: { value: MedicalForm; onChange: (next: MedicalForm) => void; errors: Record<string, string> }) => {
+export const MedicalFieldsInputs = ({
+  value: f,
+  onChange,
+  errors,
+  examples = true,
+}: {
+  value: MedicalForm;
+  onChange: (next: MedicalForm) => void;
+  errors: Record<string, string>;
+  /** Grey "e.g." text in empty fields. Off when editing saved details, where it reads like real data. */
+  examples?: boolean;
+}) => {
+  const example = (text: string) => (examples ? text : undefined);
   const set = (field: keyof MedicalForm) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => onChange({ ...f, [field]: e.target.value });
   const today = localDateKey();
   const contactRequired = Boolean(f.ecName || f.ecRelation || f.ecPhone);
@@ -15,13 +27,13 @@ export const MedicalFieldsInputs = ({ value: f, onChange, errors }: { value: Med
     <div className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Planned surgery" error={errors.plannedSurgery}>
-          <Input name="plannedSurgery" maxLength={200} value={f.plannedSurgery} onChange={set('plannedSurgery')} placeholder="e.g. Laparoscopic right hemicolectomy" />
+          <Input name="plannedSurgery" maxLength={200} value={f.plannedSurgery} onChange={set('plannedSurgery')} placeholder={example('e.g. Laparoscopic right hemicolectomy')} />
         </Field>
         <Field label="Surgery date" error={errors.plannedSurgeryDate}>
           <Input name="plannedSurgeryDate" type="date" value={f.plannedSurgeryDate} onChange={set('plannedSurgeryDate')} />
         </Field>
         <Field label="Diagnosis" error={errors.diagnosis} className="sm:col-span-2">
-          <Input name="diagnosis" maxLength={500} value={f.diagnosis} onChange={set('diagnosis')} placeholder="e.g. Colorectal cancer, stage II" />
+          <Input name="diagnosis" maxLength={500} value={f.diagnosis} onChange={set('diagnosis')} placeholder={example('e.g. Colorectal cancer, stage II')} />
         </Field>
         <Field label="Date of birth" error={errors.dateOfBirth}>
           <Input name="dateOfBirth" type="date" max={today} min="1900-01-01" value={f.dateOfBirth} onChange={set('dateOfBirth')} />
@@ -60,13 +72,13 @@ export const MedicalFieldsInputs = ({ value: f, onChange, errors }: { value: Med
           </Select>
         </Field>
         <Field label="Allergies" hint="Separate with commas" error={errors.allergies}>
-          <Input name="allergies" value={f.allergies} onChange={set('allergies')} placeholder="e.g. Penicillin" />
+          <Input name="allergies" value={f.allergies} onChange={set('allergies')} placeholder={example('e.g. Penicillin')} />
         </Field>
         <Field label="Other conditions" hint="Separate with commas" error={errors.comorbidities}>
-          <Input name="comorbidities" value={f.comorbidities} onChange={set('comorbidities')} placeholder="e.g. Hypertension, Type 2 diabetes" />
+          <Input name="comorbidities" value={f.comorbidities} onChange={set('comorbidities')} placeholder={example('e.g. Hypertension, Type 2 diabetes')} />
         </Field>
         <Field label="Medications" hint="One per line" error={errors.medications} className="sm:col-span-2">
-          <Textarea name="medications" rows={2} value={f.medications} onChange={set('medications')} placeholder="e.g. Metformin 500 mg twice daily" />
+          <Textarea name="medications" rows={2} value={f.medications} onChange={set('medications')} placeholder={example('e.g. Metformin 500 mg twice daily')} />
         </Field>
       </div>
 
@@ -77,7 +89,7 @@ export const MedicalFieldsInputs = ({ value: f, onChange, errors }: { value: Med
             <Input name="emergencyContact.name" required={contactRequired} maxLength={100} value={f.ecName} onChange={set('ecName')} />
           </Field>
           <Field label="Relationship" error={errors['emergencyContact.relation']}>
-            <Input name="emergencyContact.relation" required={contactRequired} maxLength={50} value={f.ecRelation} onChange={set('ecRelation')} placeholder="e.g. Spouse" />
+            <Input name="emergencyContact.relation" required={contactRequired} maxLength={50} value={f.ecRelation} onChange={set('ecRelation')} placeholder={example('e.g. Spouse')} />
           </Field>
           <Field label="Phone" hint={PHONE_HINT} error={errors['emergencyContact.phone']}>
             <Input name="emergencyContact.phone" type="tel" required={contactRequired} pattern={PHONE_PATTERN} value={f.ecPhone} onChange={set('ecPhone')} />

@@ -7,7 +7,7 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { IdleLogout } from '../components/IdleLogout';
 import { InstallButton } from '../components/pwa/PwaPrompts';
 import { cn } from '../lib/cn';
-import { initials } from '../lib/format';
+import { firstName, initials } from '../lib/format';
 import type { Role } from '../types/api';
 
 type NavItem = { label: string; short?: string; to: string; icon: LucideIcon };
@@ -172,7 +172,7 @@ export const DashboardLayout = () => {
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white/95 px-4 py-2.5 pt-[max(0.625rem,env(safe-area-inset-top))] backdrop-blur-md sm:px-6 print:hidden">
           <div className="flex items-center gap-3">
             <span className="text-base font-bold text-slate-900 lg:hidden">Fit for Surgery</span>
-            <p className="hidden text-base font-semibold text-slate-800 lg:block">Welcome back, {user.name.split(' ')[0]}</p>
+            <p className="hidden text-base font-semibold text-slate-800 lg:block">Welcome back, {firstName(user.name)}</p>
           </div>
 
           <div className="flex items-center gap-2">

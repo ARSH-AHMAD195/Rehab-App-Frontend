@@ -14,6 +14,15 @@ export default {
         xs: ['0.8125rem', { lineHeight: '1.25rem' }],
       },
       colors: {
+        // Patient app tokens from the design handoff (example/README.md)
+        ffs: {
+          surface: '#FFFEFC',
+          border: '#E4DED3',
+          ink: '#1C2321',
+          'ink-muted': '#47524F',
+          primary: '#1F6F6B',
+          track: '#D9E6E3',
+        },
         // Alias of slate, used for the deep hero gradients
         navy: {
           50: '#f8fafc',

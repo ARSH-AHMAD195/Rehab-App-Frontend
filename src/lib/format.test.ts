@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { daysUntil, formatReading, fromDateKey, initials, labelize, localDateKey, splitList } from './format';
+import { daysUntil, firstName, formatReading, fromDateKey, initials, labelize, localDateKey, splitList } from './format';
 
 describe('format helpers', () => {
   it('labelize handles API codes and snake case', () => {
@@ -31,6 +31,9 @@ describe('format helpers', () => {
     expect(formatReading(null)).toBe('—');
     expect(initials('Dr Meera  Nair')).toBe('DM');
     expect(initials(null)).toBe('');
+    expect(firstName('Dr Meera Nair')).toBe('Meera');
+    expect(firstName('Dr. Arjun Rao')).toBe('Arjun');
+    expect(firstName('Rajesh Iyer')).toBe('Rajesh');
     expect(splitList(' Penicillin, , Latex ')).toEqual(['Penicillin', 'Latex']);
   });
 });

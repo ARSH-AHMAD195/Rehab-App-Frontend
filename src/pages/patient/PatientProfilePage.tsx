@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { LogOut } from 'lucide-react';
+import { Check, LogOut } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { profileService } from '../../services/apiServices';
 import { qk } from '../../lib/queryClient';
@@ -126,6 +126,7 @@ export const PatientProfilePage = () => {
               Change my password
             </Link>
             <Button type="submit" loading={save.isPending} disabled={!dirty}>
+              <Check className="h-4 w-4" aria-hidden="true" />
               Save changes
             </Button>
           </div>

@@ -1,17 +1,15 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Plus, Stethoscope, Undo2 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Plus, Stethoscope } from 'lucide-react';
 import { useSignedInUser } from '../../context/AuthContext';
 import { completionService, profileService, vitalsService } from '../../services/apiServices';
-import { errorMessage } from '../../services/api';
 import { qk } from '../../lib/queryClient';
-import { daysUntil, describeTarget, formatDate, formatReading } from '../../lib/format';
-import { cn } from '../../lib/cn';
-import { Button, Card, EmptyState, ErrorState, PageLoader, SectionTitle, buttonClass } from '../../components/ui';
-import { useToast } from '../../components/ui/toast';
-import { CompleteExerciseModal } from '../../components/exercise/CompleteExerciseModal';
-import type { ChecklistItem, Reading, VitalType } from '../../types/api';
+import { daysUntil, firstName, formatDate, formatReading, fromDateKey } from '../../lib/format';
+import { useSkips } from '../../lib/skips';
+import { Card, EmptyState, ErrorState, PageLoader, SectionTitle, buttonClass } from '../../components/ui';
+import { TodayExerciseCard } from '../../components/exercise/TodayExerciseCard';
+import { ProgramProgressCard } from '../../components/patient/ProgramProgressCard';
+import type { Checklist, ChecklistItem, Reading, VitalType } from '../../types/api';
 
 const TILES: { type: VitalType; label: string }[] = [
   { type: 'BP', label: 'Blood pressure' },
@@ -41,31 +39,73 @@ const VitalTile = ({ label, reading }: { label: string; reading?: Reading }) => 
   </div>
 );
 
+/** Today's planned exercises as cards: mark done, or say you couldn't. */
+const TodayExercises = ({ patientId, checklist }: { patientId: string; checklist: Checklist }) => {
+  const { skips, skip, unskip } = useSkips(patientId, checklist.date);
+  const { items, doneCount, plannedCount, date } = checklist;
+
+  const progress = plannedCount ? Math.round((doneCount / plannedCount) * 100) : 0;
+  // To do first, then skipped, then done
+  const rank = (i: ChecklistItem) => (i.status === 'DONE' ? 2 : skips[i.itemId] ? 1 : 0);
+  const ordered = [...items].sort((a, b) => rank(a) - rank(b));
+
+  return (
+    <section className="space-y-4">
+      <div>
+        <h2 className="text-lg font-bold text-slate-900">
+          Today’s exercises
+        </h2>
+        <p className="text-sm text-slate-700">
+          {plannedCount === 0 ? 'Nothing planned for today' : doneCount >= plannedCount ? 'All done for today. Great work!' : `${doneCount} of ${plannedCount} done`}
+        </p>
+      </div>
+
+      {plannedCount > 0 && (
+        <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label="Today's exercises completed">
+          <div className="h-3 rounded-full bg-teal-700 transition-all duration-500" style={{ width: `${progress}%` }} />
+        </div>
+      )}
+
+      {items.length === 0 ? (
+        <Card>
+          <EmptyState>{checklist.planVersion === 0 ? 'Your doctor will set up your exercises shortly.' : 'Rest day: nothing is planned for today.'}</EmptyState>
+        </Card>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2">
+          {ordered.map((item) => (
+            <TodayExerciseCard
+              key={item.itemId}
+              item={item}
+              date={date}
+              skipped={skips[item.itemId]}
+              onSkip={(reason) => skip(item.itemId, reason)}
+              onUnskip={() => unskip(item.itemId)}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+};
+
 export const PatientDashboard = () => {
   const user = useSignedInUser();
-  const toast = useToast();
-  const queryClient = useQueryClient();
-  const [completing, setCompleting] = useState<ChecklistItem | null>(null);
 
   const profile = useQuery({ queryKey: qk.myProfile, queryFn: profileService.getMine });
   const medical = useQuery({ queryKey: qk.myMedical, queryFn: profileService.getMyMedical });
   const checklist = useQuery({ queryKey: qk.myChecklist, queryFn: completionService.getMyChecklist });
   const today = useQuery({ queryKey: qk.myToday, queryFn: vitalsService.getToday });
 
-  const undo = useMutation({
-    mutationFn: completionService.undo,
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['my'] }),
-    onError: (err) => toast.error(errorMessage(err, 'Could not undo. Please try again.')),
-  });
-
   if (checklist.isPending) return <PageLoader label="Loading your day…" />;
   if (checklist.isError) return <ErrorState error={checklist.error} onRetry={() => void checklist.refetch()} />;
 
-  const { items, doneCount, plannedCount, date } = checklist.data;
-  const progress = plannedCount ? Math.round((doneCount / plannedCount) * 100) : 0;
-  const ordered = [...items].sort((a, b) => Number(a.status === 'DONE') - Number(b.status === 'DONE'));
   const surgeryDate = medical.data?.plannedSurgeryDate;
   const days = daysUntil(surgeryDate);
+  // Programme progress: day 1 is the day they were enrolled, the last day is surgery day
+  const enrolled = profile.data?.createdAt;
+  const totalDays = enrolled && surgeryDate ? daysUntil(surgeryDate, new Date(enrolled)) : null;
+  const dayNumber = enrolled ? -(daysUntil(enrolled) ?? 0) + 1 : null;
+  const showProgramme = totalDays !== null && totalDays > 0 && dayNumber !== null && days !== null && days >= 0;
   const doctors = profile.data?.doctors ?? [];
 
   return (
@@ -73,16 +113,9 @@ export const PatientDashboard = () => {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
-            {greeting()}, {user.name.split(' ')[0]}
+            {greeting()}, {firstName(user.name)}
           </h1>
-          {surgeryDate && days !== null && days >= 0 && (
-            <p className="mt-1 text-base text-slate-700">
-              <strong className="text-teal-900">
-                {days} {days === 1 ? 'day' : 'days'}
-              </strong>{' '}
-              until your surgery on {formatDate(surgeryDate, { weekday: 'long', month: 'long', day: 'numeric' })}
-            </p>
-          )}
+          <p className="mt-1 text-base text-slate-700">{formatDate(new Date(), { weekday: 'long', day: 'numeric', month: 'long' })}</p>
         </div>
         <Link to="/patient/health-tracker" className={buttonClass('primary', 'md', 'hidden lg:inline-flex')}>
           <Plus className="h-4 w-4" aria-hidden="true" />
@@ -90,66 +123,14 @@ export const PatientDashboard = () => {
         </Link>
       </header>
 
-      <Card aria-labelledby="today-heading">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 id="today-heading" className="text-lg font-bold text-slate-900">
-              Today’s exercises
-            </h2>
-            <p className="text-sm text-slate-700">
-              {plannedCount === 0 ? 'Nothing planned for today' : doneCount >= plannedCount ? 'All done for today. Great work!' : `${doneCount} of ${plannedCount} done`}
-            </p>
-          </div>
-          <Link to="/patient/exercises" className="text-sm font-semibold text-teal-800 hover:underline">
-            How to do them →
-          </Link>
+      {/* 30px above Today’s exercises, as designed (24px from the page’s spacing + 6) */}
+      {showProgramme && (
+        <div className="pb-1.5">
+          <ProgramProgressCard currentDay={dayNumber} totalDays={totalDays} surgeryDate={surgeryDate ? fromDateKey(surgeryDate) : null} />
         </div>
+      )}
 
-        {plannedCount > 0 && (
-          <div className="mb-4 h-3 w-full overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label="Today's exercises completed">
-            <div className="h-3 rounded-full bg-teal-700 transition-all duration-500" style={{ width: `${progress}%` }} />
-          </div>
-        )}
-
-        {items.length === 0 ? (
-          <EmptyState>{checklist.data.planVersion === 0 ? 'Your doctor will set up your exercises shortly.' : 'Rest day: nothing is planned for today.'}</EmptyState>
-        ) : (
-          <ul className="space-y-3">
-            {ordered.map((item) => {
-              const done = item.status === 'DONE';
-              const lastTick = item.completions.at(-1);
-              return (
-                <li key={item.itemId} className={cn('flex items-center justify-between gap-3 rounded-2xl border p-4', done ? 'border-emerald-200 bg-emerald-50/60' : 'border-slate-200 bg-white')}>
-                  <div className="min-w-0">
-                    <h3 className={cn('text-base font-bold', done ? 'text-emerald-950' : 'text-slate-900')}>{item.exercise.name}</h3>
-                    <p className="text-sm text-slate-600">
-                      {[describeTarget(item.target), item.timesPerDay > 1 ? `${item.doneCount} of ${item.timesPerDay} times` : null].filter(Boolean).join(' · ')}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {lastTick && (
-                      <Button variant="ghost" size="sm" onClick={() => undo.mutate(lastTick.id)} loading={undo.isPending && undo.variables === lastTick.id} aria-label={`Undo last tick for ${item.exercise.name}`}>
-                        <Undo2 className="h-4 w-4" aria-hidden="true" />
-                      </Button>
-                    )}
-                    {done ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-100 px-3 py-2 text-sm font-semibold text-emerald-900">
-                        <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
-                        Done
-                      </span>
-                    ) : (
-                      <Button size="lg" onClick={() => setCompleting(item)}>
-                        <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
-                        Mark done<span className="sr-only">: {item.exercise.name}</span>
-                      </Button>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </Card>
+      <TodayExercises patientId={user.id} checklist={checklist.data} />
 
       <section aria-labelledby="latest-vitals">
         <div className="mb-3 flex items-center justify-between">
@@ -188,8 +169,6 @@ export const PatientDashboard = () => {
         <Plus className="h-5 w-5" aria-hidden="true" />
         Log vitals
       </Link>
-
-      {completing && <CompleteExerciseModal item={completing} date={date} onClose={() => setCompleting(null)} />}
     </div>
   );
 };

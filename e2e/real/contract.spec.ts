@@ -66,6 +66,17 @@ test('doctor: a patient chart loads every tab', async ({ page }) => {
     await expect(page.getByText(/loading/i).first(), tab).toBeHidden({ timeout: 60_000 });
     await expect(page.getByText(ERROR_TEXT), tab).toHaveCount(0);
   }
+
+  // Editing medical details starts from what's saved, not a blank or example-filled form
+  await page.getByRole('tab', { name: /^Overview/ }).click();
+  const saved = (await page.locator('dt', { hasText: 'Planned surgery' }).locator('xpath=following-sibling::dd').innerText()).trim();
+  await page.getByRole('button', { name: /^Edit$/ }).click();
+  const dialog = page.getByRole('dialog', { name: /edit medical details/i });
+  const field = dialog.locator('input[name="plannedSurgery"]');
+  await expect(field).toBeVisible({ timeout: 60_000 });
+  await expect(field).toHaveValue(saved === '—' ? '' : saved);
+  await expect(field).not.toHaveAttribute('placeholder');
+  await dialog.getByRole('button', { name: /^cancel$/i }).click();
 });
 
 test.describe('phone', () => {

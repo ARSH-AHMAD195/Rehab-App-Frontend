@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertCircle, AlertTriangle, CheckCircle2, Info, RefreshCw, X, type LucideIcon } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Check, CheckCircle2, Info, RefreshCw, X, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/cn';
 import { errorMessage } from '../../services/api';
 
@@ -325,18 +325,21 @@ export const ModalActions = ({
   submitLabel,
   loading,
   submitVariant = 'primary',
+  submitIcon: SubmitIcon = Check,
 }: {
   onCancel: () => void;
   cancelLabel?: string;
   submitLabel: string;
   loading?: boolean;
   submitVariant?: ButtonVariant;
+  submitIcon?: LucideIcon;
 }) => (
   <div className="flex gap-3 pt-2">
     <Button variant="secondary" className="flex-1" onClick={onCancel}>
       {cancelLabel}
     </Button>
     <Button type="submit" variant={submitVariant} className="flex-1" loading={loading}>
+      <SubmitIcon className="h-4 w-4" aria-hidden="true" />
       {submitLabel}
     </Button>
   </div>
