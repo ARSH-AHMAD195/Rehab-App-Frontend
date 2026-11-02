@@ -1,5 +1,37 @@
 import { describe, expect, it } from 'vitest';
-import { programmeProgress } from './programme';
+import { programmeFor, programmeProgress } from './programme';
+
+describe('which programme a patient is on', () => {
+  const now = new Date(2026, 10, 1, 10); // 1 Nov 2026
+
+  it('counts from the enrollment day up to surgery when nothing else is set', () => {
+    expect(programmeFor({ startDate: null, lengthDays: null, surgeryDate: '2026-12-11', enrolledAt: '2026-10-23T09:00:00+05:30', now })).toMatchObject({
+      currentDay: 10,
+      totalDays: 49,
+      started: true,
+    });
+  });
+
+  it('uses the programme start date and length when the doctor set them', () => {
+    expect(programmeFor({ startDate: '2026-10-29', lengthDays: 28, surgeryDate: '2026-12-11', enrolledAt: '2026-10-01', now })).toMatchObject({
+      currentDay: 4,
+      totalDays: 28,
+      started: true,
+    });
+  });
+
+  it('says not started before the start date', () => {
+    expect(programmeFor({ startDate: '2026-11-05', lengthDays: 28, surgeryDate: null, enrolledAt: '2026-10-30', now })).toMatchObject({
+      started: false,
+      start: '2026-11-05',
+    });
+  });
+
+  it('shows nothing without a length or once surgery has passed', () => {
+    expect(programmeFor({ startDate: '2026-10-29', lengthDays: null, surgeryDate: null, enrolledAt: null, now })).toBeNull();
+    expect(programmeFor({ startDate: '2026-09-01', lengthDays: 28, surgeryDate: '2026-10-20', enrolledAt: null, now })).toBeNull();
+  });
+});
 
 describe('programme progress', () => {
   it('day 1: week 1, first segment 1/7', () => {

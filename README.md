@@ -10,7 +10,7 @@ cp .env.example .env      # fill in the Firebase web config
 npm run dev               # http://localhost:5173
 ```
 
-The app talks straight to the three live APIs (see `.env.example`) and signs in with Firebase (`rehab-app-development` project). Ask the backend team for the shared demo logins. **Run the dev server on port 5173**: the APIs only accept browser calls from origins on their CORS list.
+The app talks straight to the three live APIs (see `.env.example`) and signs in with Firebase (`rehab-app-development` project). Ask the backend team for the shared demo logins. The APIs only accept browser calls from origins on their CORS list: `npm run dev` (port 5173), `npm run preview` (port 4173) and the deployed site.
 
 ## Backend
 
@@ -31,6 +31,7 @@ Source and docs: `ARSH-AHMAD195/Rehab-App-Backend`. `src/services/api.ts` (`apiB
 | Command | What it does |
 | --- | --- |
 | `npm run dev` | Dev server with HMR on port 5173 |
+| `npm run preview` | Serves the production build on port 4173, also allowed by the APIs |
 | `npm run typecheck` / `lint` | `tsc` (strict) / ESLint |
 | `npm test` | Vitest: API client routing and errors, format helpers |
 | `npm run e2e` | Playwright on a production build: PWA manifest, offline app shell, no API caching |
@@ -75,5 +76,7 @@ src/
 ## Not in the backend yet
 
 The old backend had these features and the new APIs don't, so they're out of the UI for now: notifications, consent records, follow-ups, clinical notes, progress reports and CSV export, the patient activity timeline, admin analytics and audit-log viewing.
+
+Still worked out in the frontend until the backend has them: missed-exercise alerts (from compliance counts) and the 80% "following the routine" threshold (`src/lib/compliance.ts`).
 
 Endpoints that have a service function but no screen yet: add an admin, assign doctors to a patient, alert thresholds and vital-type settings, exercise categories, plan version history, and editing a patient's account details.

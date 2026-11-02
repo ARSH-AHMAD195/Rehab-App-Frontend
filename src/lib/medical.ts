@@ -17,6 +17,8 @@ export const EMPTY_MEDICAL_FORM = {
   ecName: '',
   ecRelation: '',
   ecPhone: '',
+  programmeStartDate: '',
+  programmeLengthDays: '',
 };
 export type MedicalForm = typeof EMPTY_MEDICAL_FORM;
 
@@ -35,6 +37,8 @@ export const medicalToForm = (m: MedicalProfile): MedicalForm => ({
   ecName: m.emergencyContact?.name ?? '',
   ecRelation: m.emergencyContact?.relation ?? '',
   ecPhone: m.emergencyContact?.phone ?? '',
+  programmeStartDate: m.programmeStartDate ?? '',
+  programmeLengthDays: m.programmeLengthDays?.toString() ?? '',
 });
 
 const orNull = (s: string) => s.trim() || null;
@@ -57,6 +61,8 @@ export const formToMedical = (f: MedicalForm): MedicalFields => ({
   medications: listOrNull(f.medications, '\n'),
   smokingStatus: (orNull(f.smokingStatus) as MedicalFields['smokingStatus']) ?? null,
   emergencyContact: f.ecName.trim() ? { name: f.ecName.trim(), relation: f.ecRelation.trim(), phone: f.ecPhone.trim() } : null,
+  programmeStartDate: orNull(f.programmeStartDate),
+  programmeLengthDays: f.programmeLengthDays.trim() ? Number(f.programmeLengthDays) : null,
 });
 
 /** Only the fields that differ, so a PATCH never overwrites what it didn't change. */

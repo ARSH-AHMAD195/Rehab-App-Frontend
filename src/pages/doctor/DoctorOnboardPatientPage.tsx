@@ -7,6 +7,7 @@ import { errorMessage } from '../../services/api';
 import { useFormErrors } from '../../lib/forms';
 import { DEFAULT_TIME_ZONE, PHONE_HINT, PHONE_PATTERN } from '../../lib/constants';
 import { EMPTY_MEDICAL_FORM, formToMedical, type MedicalForm } from '../../lib/medical';
+import { localDateKey } from '../../lib/format';
 import { Alert, Button, Card, Field, Input } from '../../components/ui';
 import { useToast } from '../../components/ui/toast';
 import { MedicalFieldsInputs } from '../../components/doctor/MedicalFieldsInputs';
@@ -30,11 +31,13 @@ export const DoctorOnboardPatientPage = () => {
   const queryClient = useQueryClient();
   const form = useFormErrors();
   const [account, setAccount] = useState(EMPTY_ACCOUNT);
-  const [medical, setMedical] = useState<MedicalForm>(EMPTY_MEDICAL_FORM);
+  // The programme starts on the day they're enrolled unless the doctor picks another day
+  const [initialMedical] = useState<MedicalForm>(() => ({ ...EMPTY_MEDICAL_FORM, programmeStartDate: localDateKey() }));
+  const [medical, setMedical] = useState<MedicalForm>(initialMedical);
   const [createdId, setCreatedId] = useState<string | null>(null);
 
   const set = (field: keyof typeof EMPTY_ACCOUNT) => (e: ChangeEvent<HTMLInputElement>) => setAccount((p) => ({ ...p, [field]: e.target.value }));
-  const dirty = JSON.stringify([account, medical]) !== JSON.stringify([EMPTY_ACCOUNT, EMPTY_MEDICAL_FORM]);
+  const dirty = JSON.stringify([account, medical]) !== JSON.stringify([EMPTY_ACCOUNT, initialMedical]);
 
   // Navigate only after the guard has re-rendered with the form marked as saved
   useEffect(() => {

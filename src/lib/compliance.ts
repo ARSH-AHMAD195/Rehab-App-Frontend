@@ -1,5 +1,5 @@
 import { addDays, localDateKey } from './format';
-import type { Compliance } from '../types/api';
+import type { CaseloadRow, Compliance, Counts } from '../types/api';
 
 /**
  * Share of planned exercises done that counts as "following the routine".
@@ -14,15 +14,22 @@ export const completeDays = (days: number, today = localDateKey()) => {
   return { from: addDays(to, -(days - 1)), to };
 };
 
+/**
+ * A caseload row's range ends on the patient's today, which isn't over yet.
+ * Taking today away leaves only complete days: ask for days=8 to get the last 7, days=2 to get yesterday.
+ */
+export const completeDaysOf = (row: Pick<CaseloadRow, 'planned' | 'done' | 'skipped' | 'today'>): Counts => ({
+  planned: row.planned - row.today.planned,
+  done: row.done - row.today.done,
+  skipped: row.skipped - row.today.skipped,
+});
+
 export type Adherence = 'on-track' | 'behind' | 'no-plan';
 
-export const adherenceOf = (c: Pick<Compliance, 'planned' | 'done'>): Adherence =>
+/** Skipped exercises count as not done. */
+export const adherenceOf = (c: Pick<Counts, 'planned' | 'done'>): Adherence =>
   c.planned === 0 ? 'no-plan' : c.done / c.planned >= ON_TRACK ? 'on-track' : 'behind';
 
-/** The last day of the range if exercises were planned and not all done, else null. */
-export const missedOnLastDay = (c: Pick<Compliance, 'to' | 'byDay'>) => {
-  const day = c.byDay.find((d) => d.date === c.to);
-  return day && day.planned > day.done ? day : null;
-};
+export const missed = (c: Pick<Counts, 'planned' | 'done'>) => c.planned > c.done;
 
-export const incompleteDays = (c: Pick<Compliance, 'byDay'>) => c.byDay.filter((d) => d.planned > d.done).length;
+export const incompleteDays = (c: Pick<Compliance, 'byDay'>) => c.byDay.filter(missed).length;

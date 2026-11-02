@@ -1,16 +1,15 @@
 import { useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CheckCircle2, History, ListTodo } from 'lucide-react';
-import { useSignedInUser } from '../../context/AuthContext';
+import { History, ListTodo } from 'lucide-react';
 import { completionService, planService } from '../../services/apiServices';
 import { qk } from '../../lib/queryClient';
 import { describeDays } from '../../lib/constants';
 import { formatDate, formatDateTime } from '../../lib/format';
-import { useSkips } from '../../lib/skips';
 import { cn } from '../../lib/cn';
 import { Card, EmptyState, ErrorState, PageHeader, PageLoader } from '../../components/ui';
 import { ExerciseCard } from '../../components/exercise/ExerciseCard';
 import { TodayExerciseCard } from '../../components/exercise/TodayExerciseCard';
+import { CompletionLine } from '../../components/exercise/CompletionLine';
 import type { Checklist, PlanItem } from '../../types/api';
 
 const TabButton = ({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) => (
@@ -27,7 +26,6 @@ const TabButton = ({ active, onClick, children }: { active: boolean; onClick: ()
 export const PatientExercisesPage = () => {
   const [view, setView] = useState<'plan' | 'history'>('plan');
 
-  const user = useSignedInUser();
   const plan = useQuery({ queryKey: qk.myPlan, queryFn: planService.getMine });
   // Same query as the Today tab, so ticks made on either page show on both
   const checklist = useQuery({ queryKey: qk.myChecklist, queryFn: completionService.getMyChecklist });
@@ -60,7 +58,7 @@ export const PatientExercisesPage = () => {
 
       {view === 'history' ? (
         <Card>
-          <h2 className="mb-4 text-lg font-bold text-slate-900">Completed in the last 30 days</h2>
+          <h2 className="mb-4 text-lg font-bold text-slate-900">The last 30 days</h2>
           {history.isPending ? (
             <PageLoader label="Loading your history…" />
           ) : history.isError ? (
@@ -70,16 +68,8 @@ export const PatientExercisesPage = () => {
           ) : (
             <ul className="divide-y divide-slate-100">
               {history.data.data.map((c) => (
-                <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm">
-                  <span className="flex items-center gap-2 font-semibold text-slate-900">
-                    <CheckCircle2 className="h-5 w-5 text-emerald-700" aria-hidden="true" />
-                    {c.exercise.name}
-                  </span>
-                  <span className="text-slate-600">
-                    {formatDateTime(c.completedAt)}
-                    {c.details?.durationMin ? ` · ${c.details.durationMin} min` : ''}
-                    {c.details?.note ? ` · “${c.details.note}”` : ''}
-                  </span>
+                <li key={c.id} className="py-3 text-sm">
+                  <CompletionLine completion={c} when={formatDateTime(c.completedAt)} />
                 </li>
               ))}
             </ul>
@@ -93,15 +83,14 @@ export const PatientExercisesPage = () => {
         <PageLoader label="Loading today’s exercises…" />
       ) : (
         // Without today's checklist the cards still show, just without the tick buttons
-        <PlanCards patientId={user.id} items={items} checklist={checklist.data} />
+        <PlanCards items={items} checklist={checklist.data} />
       )}
     </div>
   );
 };
 
 /** Every exercise in the plan. Those planned for today can be ticked off here, same as on the Today tab. */
-const PlanCards = ({ patientId, items, checklist }: { patientId: string; items: PlanItem[]; checklist?: Checklist }) => {
-  const { skips, skip, unskip } = useSkips(patientId, checklist?.date ?? '');
+const PlanCards = ({ items, checklist }: { items: PlanItem[]; checklist?: Checklist }) => {
   const today = new Map((checklist?.items ?? []).map((i) => [i.itemId, i]));
 
   return (
@@ -119,9 +108,6 @@ const PlanCards = ({ patientId, items, checklist }: { patientId: string; items: 
             key={item.itemId}
             item={todays}
             date={checklist.date}
-            skipped={skips[item.itemId]}
-            onSkip={(reason) => skip(item.itemId, reason)}
-            onUnskip={() => unskip(item.itemId)}
             status={schedule}
           />
         ) : (

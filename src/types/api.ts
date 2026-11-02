@@ -92,6 +92,10 @@ export interface MedicalFields {
   medications: string[] | null;
   smokingStatus: (typeof SMOKING_STATUSES)[number] | null;
   emergencyContact: EmergencyContact | null;
+  /** The day the prehab programme starts (YYYY-MM-DD) */
+  programmeStartDate: string | null;
+  /** 1-365 */
+  programmeLengthDays: number | null;
 }
 
 /** GET .../medical-profile. `version` is 0 until something is saved. */
@@ -208,6 +212,8 @@ export interface Exercise {
   instructions: string[];
   video: Video | null;
   active: boolean;
+  /** Who added it; null for exercises added before this was recorded */
+  createdBy: { id: Id; role: 'ADMIN' | 'DOCTOR' } | null;
   createdAt: IsoDate;
   updatedAt: IsoDate;
 }
@@ -243,8 +249,10 @@ export interface ChecklistItem {
   exercise: PlanExercise;
   timesPerDay: number;
   doneCount: number;
-  status: 'NOT_YET' | 'PARTLY_DONE' | 'DONE';
+  status: 'NOT_YET' | 'PARTLY_DONE' | 'DONE' | 'SKIPPED';
   completions: { id: Id; completedAt: IsoDate }[];
+  /** Set when skipped that day; its id is what undo takes */
+  skip: { id: Id; reason: string; skippedAt: IsoDate } | null;
   target: Target | null;
   notes: string | null;
 }
@@ -255,6 +263,8 @@ export interface Checklist {
   items: ChecklistItem[];
   doneCount: number;
   plannedCount: number;
+  /** Planned times left undone because items were skipped */
+  skippedCount: number;
 }
 
 export interface Completion {
@@ -263,6 +273,9 @@ export interface Completion {
   exercise: { id: Id; name: string; category: string };
   planVersion: number;
   date: string;
+  /** DONE = a tick; SKIPPED = skipped for the day, with a reason */
+  status: 'DONE' | 'SKIPPED';
+  reason: string | null;
   completedAt: IsoDate;
   details: { durationMin?: number | null; note?: string | null } | null;
 }
@@ -272,9 +285,26 @@ export interface Compliance {
   to: string;
   planned: number;
   done: number;
+  skipped: number;
   percentage: number | null;
-  byDay: { date: string; planned: number; done: number }[];
-  byExercise: { itemId: string; exerciseId: Id; name: string; planned: number; done: number }[];
+  byDay: { date: string; planned: number; done: number; skipped: number }[];
+  byExercise: { itemId: string; exerciseId: Id; name: string; planned: number; done: number; skipped: number }[];
+}
+
+export interface Counts {
+  planned: number;
+  done: number;
+  skipped: number;
+}
+
+/** One row of GET /doctor/exercise-compliance: the range ends on the patient's today, so it includes today. */
+export interface CaseloadRow extends Counts {
+  patient: Ref;
+  from: string;
+  to: string;
+  percentage: number | null;
+  today: Counts;
+  lastActivityAt: IsoDate | null;
 }
 
 // ---------- Errors ----------

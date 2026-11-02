@@ -1,13 +1,12 @@
-import { sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { sendEmailVerification, sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { firebaseAuth } from '../lib/firebase';
 import { api, ApiError, errorMessage } from './api';
 import type { User } from '../types/api';
 
 // Sign-in, sign-out and password reset happen in Firebase; the Auth API only says who we are.
+// /auth/me answers even before the email is verified, so the app can show the "verify your email" screen.
 const getMe = async (): Promise<User> => {
   const me = await api.get<User>('/auth/me');
-  // Every Auth API route except /auth/me refuses an unverified email, so don't let them in half-working
-  if (!me.emailVerified) throw Object.assign(new Error('Email not verified'), { code: 'auth/email-not-verified' });
   return { ...me, role: me.role.toLowerCase() as User['role'] };
 };
 
@@ -23,6 +22,18 @@ export const authService = {
   },
   logout: () => signOut(firebaseAuth),
   getMe,
+  /** After the user clicks the link: refresh Firebase's copy of the account and a fresh token, then ask the API again. */
+  recheckVerification: async () => {
+    const current = firebaseAuth.currentUser;
+    if (current) {
+      await current.reload();
+      await current.getIdToken(true);
+    }
+    return getMe();
+  },
+  sendVerificationEmail: async () => {
+    if (firebaseAuth.currentUser) await sendEmailVerification(firebaseAuth.currentUser);
+  },
   sendPasswordReset: (email: string) => sendPasswordResetEmail(firebaseAuth, email),
 };
 
@@ -32,12 +43,10 @@ const FIREBASE_ERRORS: Record<string, string> = {
   'auth/user-disabled': 'This account has been deactivated. Please contact your care team.',
   'auth/too-many-requests': 'Too many attempts. Please wait a few minutes and try again.',
   'auth/network-request-failed': 'Unable to reach the server. Check your connection and try again.',
-  'auth/email-not-verified': 'Your email address isn’t verified yet. Use the link in your invitation email, or “Forgot password?” to get a new one.',
 };
 
-/** True when a failure means "this account can't sign in", not a network or server problem. */
-export const isAccountRejection = (err: unknown) =>
-  (err instanceof ApiError && (err.status === 401 || err.status === 403)) || (err as { code?: unknown } | null)?.code === 'auth/email-not-verified';
+/** True when a failure means "this account can't sign in" (401/403), not a network or server problem. */
+export const isAccountRejection = (err: unknown) => err instanceof ApiError && (err.status === 401 || err.status === 403);
 
 /** A sign-in or reset failure in words, whether it came from Firebase or the Auth API. */
 export const authErrorMessage = (err: unknown, fallback: string) => {

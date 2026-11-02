@@ -38,6 +38,11 @@ for (const role of ['patient', 'doctor', 'admin'] as const) {
     test.skip(!password, 'Set E2E_PASSWORD');
     await signIn(page, accounts[role], password);
     await expectPagesLoad(page, PAGES[role]);
+    // Doctors can add exercises to the library (backend PR #6)
+    if (role === 'doctor') {
+      await page.goto('/doctor/exercises');
+      await expect(page.getByRole('button', { name: /add exercise/i })).toBeEnabled({ timeout: 60_000 });
+    }
   });
 }
 

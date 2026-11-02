@@ -52,6 +52,7 @@ describe('api client', () => {
       ['/patients/me/exercise-completions', 'https://exercise.test/api/v1'],
       ['/patients/abc/exercise-plan/versions', 'https://exercise.test/api/v1'],
       ['/patients/abc/exercise-compliance', 'https://exercise.test/api/v1'],
+      ['/doctor/exercise-compliance', 'https://exercise.test/api/v1'],
     ];
     for (const [path, base] of routes) expect(apiBaseFor(path), path).toBe(base);
   });

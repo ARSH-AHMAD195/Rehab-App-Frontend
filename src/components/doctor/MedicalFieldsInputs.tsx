@@ -32,6 +32,12 @@ export const MedicalFieldsInputs = ({
         <Field label="Surgery date" error={errors.plannedSurgeryDate}>
           <Input name="plannedSurgeryDate" type="date" value={f.plannedSurgeryDate} onChange={set('plannedSurgeryDate')} />
         </Field>
+        <Field label="Programme start date" hint="Day 1 of the prehab programme" error={errors.programmeStartDate}>
+          <Input name="programmeStartDate" type="date" value={f.programmeStartDate} onChange={set('programmeStartDate')} />
+        </Field>
+        <Field label="Programme length (days)" hint="Leave blank to run until surgery" error={errors.programmeLengthDays}>
+          <Input name="programmeLengthDays" type="number" inputMode="numeric" min="1" max="365" value={f.programmeLengthDays} onChange={set('programmeLengthDays')} />
+        </Field>
         <Field label="Diagnosis" error={errors.diagnosis} className="sm:col-span-2">
           <Input name="diagnosis" maxLength={500} value={f.diagnosis} onChange={set('diagnosis')} placeholder={example('e.g. Colorectal cancer, stage II')} />
         </Field>
