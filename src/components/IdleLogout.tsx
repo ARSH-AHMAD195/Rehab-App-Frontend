@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { t } from '../lib/i18n';
 import { Button, Modal } from './ui';
 
 const IDLE_MS = (Number(import.meta.env.VITE_IDLE_TIMEOUT_MINUTES) || 15) * 60_000;
@@ -62,14 +63,14 @@ export const IdleLogout = () => {
   return (
     <Modal title="Are you still there?">
       <p className="text-sm text-slate-700" aria-live="polite">
-        For your privacy you’ll be signed out in <strong>{secondsLeft} seconds</strong> due to inactivity.
+        {t('For your privacy you’ll be signed out in {n} seconds due to inactivity.', { n: secondsLeft })}
       </p>
       <div className="mt-5 flex gap-3">
         <Button variant="secondary" className="flex-1" onClick={() => void logout()}>
-          Sign out now
+          {t('Sign out now')}
         </Button>
         <Button className="flex-1" onClick={() => (lastActivity.current = Date.now())}>
-          Stay signed in
+          {t('Stay signed in')}
         </Button>
       </div>
     </Modal>

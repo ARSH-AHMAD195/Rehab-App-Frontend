@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { errorMessage } from '../../services/api';
 import { TREND_PERIODS } from '../../lib/constants';
-import { useVitalTypes } from '../../lib/vitals';
+import { t as tr } from '../../lib/i18n';
+import { useVitalTypes, vitalName } from '../../lib/vitals';
 import { formatDate } from '../../lib/format';
 import { Alert, Select } from '../ui';
 import { TrendChart, type TrendRow } from './TrendChart';
@@ -20,8 +21,8 @@ const trendToChart = (trend: Trend) => {
   const pairs: [string, ThresholdPair | null | undefined][] =
     trend.type === 'BP' ? Object.entries((trend.thresholds ?? {}) as Record<string, ThresholdPair | null>) : [['', trend.thresholds as ThresholdPair | null]];
   const limits = pairs.flatMap(([field, t]) => [
-    ...(t?.high != null ? [{ value: t.high, label: `${field} high`.trim() }] : []),
-    ...(t?.low != null ? [{ value: t.low, label: `${field} low`.trim() }] : []),
+    ...(t?.high != null ? [{ value: t.high, label: tr(`${field} high`.trim()) }] : []),
+    ...(t?.low != null ? [{ value: t.low, label: tr(`${field} low`.trim()) }] : []),
   ]);
   return { rows, keys, limits };
 };
@@ -39,32 +40,32 @@ export const VitalTrend = ({ queryKeyBase, load }: { queryKeyBase: readonly stri
 
   const pickers = (
     <div className="flex flex-wrap gap-2">
-      <Select aria-label="Reading" className="w-auto" value={type} onChange={(e) => setType(e.target.value as VitalType)}>
+      <Select aria-label={tr('Reading')} className="w-auto" value={type} onChange={(e) => setType(e.target.value as VitalType)}>
         {(types.data ?? []).filter((t) => t.valueKind !== 'text').map((t) => (
           <option key={t.type} value={t.type}>
-            {t.label}
+            {vitalName(t.type, t.label)}
           </option>
         ))}
       </Select>
-      <Select aria-label="Period" className="w-auto" value={period} onChange={(e) => setPeriod(e.target.value as TrendPeriod)}>
+      <Select aria-label={tr('Period')} className="w-auto" value={period} onChange={(e) => setPeriod(e.target.value as TrendPeriod)}>
         {TREND_PERIODS.map(([value, label]) => (
           <option key={value} value={value}>
-            {label}
+            {tr(label)}
           </option>
         ))}
       </Select>
     </div>
   );
 
-  if (trend.isError) return <Alert tone="error">The chart could not be loaded: {errorMessage(trend.error)}</Alert>;
+  if (trend.isError) return <Alert tone="error">{tr('The chart could not be loaded: {error}', { error: errorMessage(trend.error) })}</Alert>;
 
   return (
     <TrendChart
-      title={def?.label ?? 'Trend'}
-      subtitle={trend.data?.unit ? `One value per day (${trend.data.unit})` : 'One value per day'}
+      title={def ? vitalName(def.type, def.label) : tr('Trend')}
+      subtitle={trend.data?.unit ? tr('One value per day ({unit})', { unit: trend.data.unit }) : tr('One value per day')}
       actions={pickers}
       data={chart?.rows ?? []}
-      series={(chart?.keys ?? []).map((k, i) => ({ key: k, name: k === 'values' ? (def?.label ?? type) : k[0]!.toUpperCase() + k.slice(1), color: COLORS[i]! }))}
+      series={(chart?.keys ?? []).map((k, i) => ({ key: k, name: k === 'values' ? (def ? vitalName(def.type, def.label) : type) : tr(k[0]!.toUpperCase() + k.slice(1)), color: COLORS[i]! }))}
       limits={chart?.limits}
     />
   );

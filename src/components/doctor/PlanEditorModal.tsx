@@ -7,6 +7,7 @@ import { qk } from '../../lib/queryClient';
 import { useFormErrors } from '../../lib/forms';
 import { EVERY_DAY, WEEKDAYS } from '../../lib/constants';
 import { cn } from '../../lib/cn';
+import { toTarget } from '../../lib/format';
 import { Alert, Button, EmptyState, Field, Input, Modal, ModalActions, PageLoader, Select } from '../ui';
 import { useToast } from '../ui/toast';
 import type { Plan } from '../../types/api';
@@ -24,13 +25,11 @@ const toRows = (plan: Plan): Row[] =>
     notes: i.notes ?? '',
   }));
 
-const num = (s: string) => (s.trim() ? Number(s) : null);
-
 const toItems = (rows: Row[]): PlanItemInput[] =>
   rows.map((r) => ({
     exerciseId: r.exerciseId,
     schedule: { daysOfWeek: [...r.daysOfWeek].sort(), timesPerDay: Number(r.timesPerDay) },
-    target: r.sets || r.reps || r.durationMin ? { sets: num(r.sets), reps: num(r.reps), durationMin: num(r.durationMin) } : null,
+    target: toTarget(r),
     notes: r.notes.trim() || null,
   }));
 
@@ -144,10 +143,10 @@ export const PlanEditorModal = ({ patientId, plan, onClose }: { patientId: strin
                         <Input name={`items.${i}.schedule.timesPerDay`} type="number" inputMode="numeric" min="1" max="10" required value={r.timesPerDay} onChange={(e) => update(i, { timesPerDay: e.target.value })} />
                       </Field>
                       <Field label="Sets" error={form.errors[`items.${i}.target.sets`]}>
-                        <Input name={`items.${i}.target.sets`} type="number" inputMode="numeric" min="1" max="20" value={r.sets} onChange={(e) => update(i, { sets: e.target.value })} />
+                        <Input name={`items.${i}.target.sets`} type="number" inputMode="numeric" min="0" max="20" value={r.sets} onChange={(e) => update(i, { sets: e.target.value })} />
                       </Field>
                       <Field label="Reps" error={form.errors[`items.${i}.target.reps`]}>
-                        <Input name={`items.${i}.target.reps`} type="number" inputMode="numeric" min="1" max="100" value={r.reps} onChange={(e) => update(i, { reps: e.target.value })} />
+                        <Input name={`items.${i}.target.reps`} type="number" inputMode="numeric" min="0" max="100" value={r.reps} onChange={(e) => update(i, { reps: e.target.value })} />
                       </Field>
                       <Field label="Minutes" error={form.errors[`items.${i}.target.durationMin`]}>
                         <Input name={`items.${i}.target.durationMin`} type="number" inputMode="numeric" min="1" max="240" value={r.durationMin} onChange={(e) => update(i, { durationMin: e.target.value })} />

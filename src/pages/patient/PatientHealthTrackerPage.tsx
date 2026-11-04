@@ -2,12 +2,14 @@ import { useQuery } from '@tanstack/react-query';
 import { vitalsService } from '../../services/apiServices';
 import { errorMessage } from '../../services/api';
 import { qk } from '../../lib/queryClient';
+import { t, useLang } from '../../lib/i18n';
 import { Alert, Card, PageHeader, SectionTitle } from '../../components/ui';
 import { VitalsForm } from '../../components/health/VitalsForm';
 import { VitalTrend } from '../../components/health/VitalTrend';
 import { LogsTable } from '../../components/health/LogsTable';
 
 export const PatientHealthTrackerPage = () => {
+  useLang();
   // Last 30 days, newest first (the API's default range)
   const logs = useQuery({ queryKey: qk.myLogs, queryFn: () => vitalsService.getLogs({ limit: 30 }) });
 
@@ -25,7 +27,7 @@ export const PatientHealthTrackerPage = () => {
       <Card>
         <SectionTitle title="Past 30 days" />
         {logs.isError ? (
-          <Alert tone="error">Your history could not be loaded: {errorMessage(logs.error)}</Alert>
+          <Alert tone="error">{t('Your history could not be loaded: {error}', { error: errorMessage(logs.error) })}</Alert>
         ) : (
           <LogsTable logs={logs.data?.data ?? []} emptyMessage={logs.isPending ? 'Loading…' : 'Nothing logged in the last 30 days.'} />
         )}

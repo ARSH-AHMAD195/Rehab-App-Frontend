@@ -1,5 +1,6 @@
 import { useRef, type KeyboardEvent } from 'react';
 import { cn } from '../../lib/cn';
+import { ScrollX } from './index';
 
 export interface TabDef<T extends string> {
   id: T;
@@ -39,7 +40,7 @@ export const Tabs = <T extends string>({
   };
 
   return (
-    <div role="tablist" aria-label={label} className="flex gap-1 overflow-x-auto border-b border-slate-200">
+    <ScrollX role="tablist" aria-label={label} className="flex gap-1 border-b border-slate-200">
       {tabs.map((t, i) => {
         const selected = t.id === value;
         return (
@@ -69,6 +70,6 @@ export const Tabs = <T extends string>({
           </button>
         );
       })}
-    </div>
+    </ScrollX>
   );
 };

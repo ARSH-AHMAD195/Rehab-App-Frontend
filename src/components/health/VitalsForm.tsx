@@ -5,7 +5,8 @@ import { vitalsService, type ReadingChanges } from '../../services/apiServices';
 import { ApiError } from '../../services/api';
 import { qk } from '../../lib/queryClient';
 import { useFormErrors } from '../../lib/forms';
-import { useVitalLabel, useVitalTypes } from '../../lib/vitals';
+import { t } from '../../lib/i18n';
+import { useVitalLabel, useVitalTypes, vitalName } from '../../lib/vitals';
 import { Alert, Button, ErrorState, Field, Input, PageLoader, Textarea } from '../ui';
 import { useToast } from '../ui/toast';
 import type { DailyLog, ReadingValue, SavedAlert, VitalTypeDef } from '../../types/api';
@@ -66,7 +67,7 @@ export const VitalsForm = ({ onSaved }: { onSaved?: () => void }) => {
       setEdits({});
       queryClient.setQueryData(qk.myToday, log);
       void queryClient.invalidateQueries({ queryKey: ['my', 'vitals'] });
-      if (!log.alerts.length) toast.success('Today’s readings are saved.');
+      if (!log.alerts.length) toast.success(t('Today’s readings are saved.'));
       onSaved?.();
     },
     onError: (err) => {
@@ -115,12 +116,12 @@ export const VitalsForm = ({ onSaved }: { onSaved?: () => void }) => {
     <form noValidate onSubmit={handleSubmit} onChange={form.onChange} className="space-y-5">
       {alerts.length > 0 && (
         <Alert tone="warning" title="Your care team has been alerted">
-          {alerts.map((a) => `${vitalLabel(a.type)}${a.field ? ` (${a.field})` : ''} is ${a.rule === 'ABOVE_HIGH' ? 'above' : 'below'} ${a.threshold}`).join('; ')}. If you feel unwell, contact your care team or emergency services.
+          {alerts.map((a) => t(a.rule === 'ABOVE_HIGH' ? '{label} is above {threshold}' : '{label} is below {threshold}', { label: `${vitalLabel(a.type)}${a.field ? ` (${t(a.field)})` : ''}`, threshold: a.threshold })).join('; ')}. {t('If you feel unwell, contact your care team or emergency services.')}
         </Alert>
       )}
       {form.formError && <Alert tone="error">{form.formError}</Alert>}
       <p className="text-sm text-slate-700">
-        {today.data.filledCount} of {today.data.totalCount} filled for {today.data.date}. Fill in what you have; you can come back later today.
+        {t('{filled} of {total} filled for {date}. Fill in what you have; you can come back later today.', { filled: today.data.filledCount, total: today.data.totalCount, date: today.data.date })}
       </p>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -128,14 +129,14 @@ export const VitalsForm = ({ onSaved }: { onSaved?: () => void }) => {
           def.valueKind === 'pair' ? (
             <fieldset key={def.type} className="grid grid-cols-2 gap-3 sm:col-span-2 lg:col-span-1">
               <legend className="mb-1 text-sm font-semibold text-slate-800">
-                {def.label} ({def.unit})
+                {vitalName(def.type, def.label)} ({def.unit})
               </legend>
               {input(def, `readings.${def.type}.systolic`, 'Top number')}
               {input(def, `readings.${def.type}.diastolic`, 'Bottom number')}
             </fieldset>
           ) : (
             <div key={def.type} className={def.valueKind === 'text' ? 'sm:col-span-2 lg:col-span-3' : undefined}>
-              {input(def, inputsFor(def)[0]!, `${def.label}${def.isOptional ? ' (optional)' : ''}`)}
+              {input(def, inputsFor(def)[0]!, `${vitalName(def.type, def.label)}${def.isOptional ? ` ${t('(optional)')}` : ''}`)}
             </div>
           )
         )}
@@ -144,7 +145,7 @@ export const VitalsForm = ({ onSaved }: { onSaved?: () => void }) => {
       <div className="flex justify-end">
         <Button type="submit" size="lg" loading={save.isPending} disabled={!changedCount}>
           <Check className="h-4 w-4" aria-hidden="true" />
-          Save {changedCount ? `${changedCount} ${changedCount === 1 ? 'change' : 'changes'}` : ''}
+          {changedCount === 0 ? t('Save') : changedCount === 1 ? t('Save 1 change') : t('Save {n} changes', { n: changedCount })}
         </Button>
       </div>
     </form>

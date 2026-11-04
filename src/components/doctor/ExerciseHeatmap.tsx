@@ -4,7 +4,7 @@ import { errorMessage } from '../../services/api';
 import { qk } from '../../lib/queryClient';
 import { addDays, formatDate, fromDateKey, localDateKey } from '../../lib/format';
 import { cn } from '../../lib/cn';
-import { Alert, PageLoader } from '../ui';
+import { Alert, PageLoader, ScrollX } from '../ui';
 
 // The Exercise API's compliance range is at most 90 days
 const DAYS = 90;
@@ -39,7 +39,7 @@ export const ExerciseHeatmap = ({ patientId }: { patientId: string }) => {
 
   return (
     <div>
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <ScrollX className="flex gap-2 pb-1">
         <div className="grid grid-rows-7 gap-1 pt-0 text-[10px] leading-3 text-slate-500" aria-hidden="true">
           {['Mon', '', 'Wed', '', 'Fri', '', 'Sun'].map((d, i) => (
             <span key={i} className="h-3.5">
@@ -66,7 +66,7 @@ export const ExerciseHeatmap = ({ patientId }: { patientId: string }) => {
             );
           })}
         </div>
-      </div>
+      </ScrollX>
       <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
         {LEGEND.map(([tone, label]) => (
           <li key={label} className="flex items-center gap-1.5">

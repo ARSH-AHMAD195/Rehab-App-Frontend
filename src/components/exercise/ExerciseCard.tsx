@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { AlertTriangle, CheckCircle2, Play } from 'lucide-react';
 import { labelize } from '../../lib/format';
+import { t } from '../../lib/i18n';
 import { Badge, Button } from '../ui';
 import { ExerciseDetailModal } from './ExerciseDetailModal';
 import type { PlanExercise, Target } from '../../types/api';
@@ -32,9 +33,9 @@ export const ExerciseCard = ({
 }) => {
   const [showDetail, setShowDetail] = useState(false);
   const tiles: [number, string][] = [];
-  if (target?.sets) tiles.push([target.sets, 'Sets']);
-  if (target?.reps) tiles.push([target.reps, 'Reps']);
-  if (target?.durationMin) tiles.push([target.durationMin, 'Mins']);
+  if (target?.sets) tiles.push([target.sets, t('Sets')]);
+  if (target?.reps) tiles.push([target.reps, t('Reps')]);
+  if (target?.durationMin) tiles.push([target.durationMin, t('Mins')]);
 
   return (
     <article className="space-y-3 rounded-3xl border border-slate-200 bg-white p-4 shadow-xs sm:p-5">
@@ -48,7 +49,7 @@ export const ExerciseCard = ({
 
       <Button variant="secondary" className="w-full" onClick={() => setShowDetail(true)}>
         <Play className="h-4 w-4 text-teal-700" aria-hidden="true" />
-        Instructions & Video
+        {t('Instructions & Video')}
       </Button>
 
       {tiles.length > 0 && (
@@ -61,7 +62,7 @@ export const ExerciseCard = ({
 
       <p className="flex items-start gap-2 rounded-xl bg-rose-50 p-3 text-sm font-medium text-rose-950">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-700" aria-hidden="true" />
-        <span>{notes || DEFAULT_SAFETY}</span>
+        <span>{notes || t(DEFAULT_SAFETY)}</span>
       </p>
 
       {children}
@@ -74,6 +75,6 @@ export const ExerciseCard = ({
 export const DonePill = () => (
   <span className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-100 px-3 py-1.5 text-sm font-semibold text-emerald-900">
     <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
-    Done
+    {t('Done')}
   </span>
 );

@@ -67,6 +67,7 @@ const routes: RouteObject[] = [
       ]),
       roleArea('admin', [
         { path: 'dashboard', ...page(() => import('./pages/admin/AdminDashboard'), 'AdminDashboard') },
+        { path: 'patients', ...page(() => import('./pages/admin/AdminPatientsPage'), 'AdminPatientsPage') },
         { path: 'doctors', ...page(() => import('./pages/admin/AdminDoctorsPage'), 'AdminDoctorsPage') },
         { path: 'exercises', ...page(() => import('./pages/admin/AdminExercisesPage'), 'AdminExercisesPage') },
       ]),

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Activity, Dumbbell, Heart, LogOut, Stethoscope, UserCircle, UserPlus, Users, type LucideIcon } from 'lucide-react';
+import { Activity, Dumbbell, Heart, Languages, LogOut, Stethoscope, UserCircle, UserPlus, Users, type LucideIcon } from 'lucide-react';
 import { useSignedInUser, useAuth } from '../context/AuthContext';
 import { MedicalDisclaimer } from '../components/common/MedicalDisclaimer';
 import { ErrorBoundary } from '../components/ErrorBoundary';
@@ -8,6 +8,7 @@ import { IdleLogout } from '../components/IdleLogout';
 import { InstallButton } from '../components/pwa/PwaPrompts';
 import { cn } from '../lib/cn';
 import { firstName, initials } from '../lib/format';
+import { setLang, t, useLang, usePatientLanguage } from '../lib/i18n';
 import type { Role } from '../types/api';
 
 type NavItem = { label: string; short?: string; to: string; icon: LucideIcon };
@@ -27,6 +28,7 @@ const NAV: Record<Role, NavItem[]> = {
   ],
   admin: [
     { label: 'System Overview', short: 'Overview', to: '/admin/dashboard', icon: Activity },
+    { label: 'All Patients', short: 'Patients', to: '/admin/patients', icon: Users },
     { label: 'Exercise Library', short: 'Exercises', to: '/admin/exercises', icon: Dumbbell },
     { label: 'Doctor Accounts', short: 'Doctors', to: '/admin/doctors', icon: Stethoscope },
   ],
@@ -61,7 +63,7 @@ const BottomTabs = ({ items }: { items: NavItem[] }) => (
                 <span className={cn('flex h-8 w-12 items-center justify-center rounded-full transition-colors', isActive && 'bg-teal-100')}>
                   <Icon className="h-5 w-5" aria-hidden="true" />
                 </span>
-                {short ?? label}
+                {t(short ?? label)}
               </>
             )}
           </NavLink>
@@ -84,9 +86,25 @@ const NavItems = ({ items }: { items: NavItem[] }) =>
       }
     >
       <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
-      <span>{label}</span>
+      <span>{t(label)}</span>
     </NavLink>
   ));
+
+/** Patients only. Each language is named in itself, so it can be found without reading the other. */
+const LanguageSwitch = () => {
+  const hindi = useLang() === 'hi';
+  return (
+    <button
+      type="button"
+      onClick={() => setLang(hindi ? 'en' : 'hi')}
+      lang={hindi ? 'en' : 'hi'}
+      className="flex min-h-10 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900"
+    >
+      <Languages className="h-4 w-4" aria-hidden="true" />
+      {hindi ? 'English' : 'हिन्दी'}
+    </button>
+  );
+};
 
 export const DashboardLayout = () => {
   const user = useSignedInUser();
@@ -95,6 +113,8 @@ export const DashboardLayout = () => {
   const { pathname } = useLocation();
   const mainRef = useRef<HTMLElement>(null);
   const firstRender = useRef(true);
+  useLang();
+  usePatientLanguage(user.role === 'patient');
 
   // Move focus to the new page on navigation so screen readers announce it
   useEffect(() => {
@@ -117,17 +137,18 @@ export const DashboardLayout = () => {
     <button
       type="button"
       onClick={handleLogout}
-      className={cn('flex min-h-10 items-center gap-2 rounded-xl text-sm font-medium text-slate-700 transition-colors hover:bg-rose-50 hover:text-rose-700', className)}
+      aria-label={t('Sign out')}
+      title={t('Sign out')}
+      className={cn('flex min-h-10 min-w-10 items-center justify-center rounded-xl text-slate-700 transition-colors hover:bg-rose-50 hover:text-rose-700', className)}
     >
       <LogOut className="h-4 w-4" aria-hidden="true" />
-      <span>Sign out</span>
     </button>
   );
 
   return (
     <div className="flex min-h-screen bg-slate-50">
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[80] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:shadow-lg">
-        Skip to main content
+        {t('Skip to main content')}
       </a>
 
       <aside className="hidden w-72 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex print:hidden">
@@ -137,7 +158,7 @@ export const DashboardLayout = () => {
           </div>
           <div>
             <p className="text-lg font-bold leading-none tracking-tight text-slate-900">Fit for Surgery</p>
-            <span className="text-xs font-semibold uppercase tracking-wide text-teal-800">Prehabilitation</span>
+            <span className="text-xs font-semibold uppercase tracking-wide text-teal-800">{t('Prehabilitation')}</span>
           </div>
         </div>
 
@@ -152,7 +173,7 @@ export const DashboardLayout = () => {
                   ROLE_BADGE[role]
                 )}
               >
-                {role}
+                {t(role)}
               </span>
             </div>
           </div>
@@ -172,11 +193,12 @@ export const DashboardLayout = () => {
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white/95 px-4 py-2.5 pt-[max(0.625rem,env(safe-area-inset-top))] backdrop-blur-md sm:px-6 print:hidden">
           <div className="flex items-center gap-3">
             <span className="text-base font-bold text-slate-900 lg:hidden">Fit for Surgery</span>
-            <p className="hidden text-base font-semibold text-slate-800 lg:block">Welcome back, {firstName(user.name)}</p>
+            <p className="hidden text-base font-semibold text-slate-800 lg:block">{t('Welcome back, {name}', { name: firstName(user.name) })}</p>
           </div>
 
           <div className="flex items-center gap-2">
             <InstallButton className="lg:hidden" />
+            {role === 'patient' && <LanguageSwitch />}
             {logoutButton('px-3')}
           </div>
         </header>

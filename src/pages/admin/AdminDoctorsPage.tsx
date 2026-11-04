@@ -1,4 +1,5 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Mail, UserPlus } from 'lucide-react';
 import { doctorService, resendInvitation } from '../../services/apiServices';
@@ -7,7 +8,7 @@ import { qk } from '../../lib/queryClient';
 import { useFormErrors } from '../../lib/forms';
 import { PHONE_HINT, PHONE_PATTERN } from '../../lib/constants';
 import { formatDate } from '../../lib/format';
-import { Alert, Badge, Button, ConfirmDialog, ErrorState, Field, Input, Modal, ModalActions, PageHeader, PageLoader } from '../../components/ui';
+import { Alert, Badge, Button, ConfirmDialog, ErrorState, Field, Input, Modal, ModalActions, PageHeader, PageLoader, ScrollX } from '../../components/ui';
 import { useToast } from '../../components/ui/toast';
 import type { Doctor } from '../../types/api';
 
@@ -101,8 +102,8 @@ export const AdminDoctorsPage = () => {
         }
       />
 
-      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
+      <div className="overflow-clip rounded-3xl border border-slate-200 bg-white shadow-sm">
+        <ScrollX>
           <table className="w-full text-left text-sm">
             <thead className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-600">
               <tr>
@@ -131,7 +132,12 @@ export const AdminDoctorsPage = () => {
                       <span className="text-slate-600">{doc.email}</span>
                     </td>
                     <td className="p-4 text-slate-700">{doc.specialization || '—'}</td>
-                    <td className="p-4 text-slate-700">{doc.patientCount}</td>
+                    <td className="p-4">
+                      <Link to={`/admin/patients?doctor=${doc.id}`} className="font-semibold text-teal-800 underline">
+                        {doc.patientCount}
+                        <span className="sr-only"> patients assigned to {doc.name}</span>
+                      </Link>
+                    </td>
                     <td className="p-4">
                       {!doc.active ? <Badge tone="rose">Deactivated</Badge> : doc.emailVerified ? <Badge tone="emerald">Active</Badge> : <Badge tone="amber">Invited</Badge>}
                     </td>
@@ -150,7 +156,7 @@ export const AdminDoctorsPage = () => {
               )}
             </tbody>
           </table>
-        </div>
+        </ScrollX>
       </div>
 
       {showRegister && <RegisterDoctorModal onClose={() => setShowRegister(false)} />}

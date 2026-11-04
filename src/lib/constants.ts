@@ -1,4 +1,5 @@
 import type { Role, TrendPeriod } from '../types/api';
+import { t } from './i18n';
 
 export const HOME_BY_ROLE: Record<Role, string> = {
   patient: '/patient/dashboard',
@@ -11,7 +12,7 @@ export const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as con
 export const EVERY_DAY = [1, 2, 3, 4, 5, 6, 7];
 
 export const describeDays = (days: number[]) =>
-  days.length === 7 ? 'Every day' : [...days].sort().map((d) => WEEKDAYS[d - 1]).join(', ');
+  days.length === 7 ? t('Every day') : [...days].sort().map((d) => t(WEEKDAYS[d - 1]!)).join(', ');
 
 export const TREND_PERIODS: readonly [TrendPeriod, string][] = [
   ['7d', 'Last 7 days'],

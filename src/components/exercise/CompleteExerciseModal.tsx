@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { completionService } from '../../services/apiServices';
 import { ApiError } from '../../services/api';
 import { useFormErrors } from '../../lib/forms';
+import { t } from '../../lib/i18n';
 import { Alert, Field, Input, Modal, ModalActions, Textarea } from '../ui';
 import { useToast } from '../ui/toast';
 import type { ChecklistItem } from '../../types/api';
@@ -23,7 +24,7 @@ export const CompleteExerciseModal = ({ item, date, onClose }: { item: Checklist
       return completionService.complete({ itemId: item.itemId, date, details: Object.keys(details).length ? details : null }, idempotencyKey);
     },
     onSuccess: () => {
-      toast.success(`Well done! "${item.exercise.name}" is ticked off.`);
+      toast.success(t('Well done! "{name}" is ticked off.', { name: item.exercise.name }));
       void queryClient.invalidateQueries({ queryKey: ['my'] });
       onClose();
     },
@@ -48,7 +49,7 @@ export const CompleteExerciseModal = ({ item, date, onClose }: { item: Checklist
           <Input name="details.durationMin" type="number" inputMode="numeric" min="1" max="240" value={minutes} onChange={(e) => setMinutes(e.target.value)} />
         </Field>
         <Field label="Note for your care team (optional)" error={form.errors['details.note']}>
-          <Textarea name="details.note" rows={2} maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Slight knee soreness at the end" />
+          <Textarea name="details.note" rows={2} maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('e.g. Slight knee soreness at the end')} />
         </Field>
         <ModalActions onCancel={onClose} submitLabel="Done" loading={save.isPending} />
       </form>

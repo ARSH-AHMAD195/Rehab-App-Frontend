@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Undo2, XCircle } from 'lucide-react';
 import { completionService } from '../../services/apiServices';
 import { errorMessage } from '../../services/api';
+import { t } from '../../lib/i18n';
 import { Button } from '../ui';
 import { useToast } from '../ui/toast';
 import { CompleteExerciseModal } from './CompleteExerciseModal';
@@ -39,15 +40,15 @@ export const TodayExerciseCard = ({
     lastTick && (
       <Button variant="ghost" size="sm" className="w-full" onClick={() => undo.mutate(lastTick.id)} loading={undo.isPending}>
         <Undo2 className="h-4 w-4" aria-hidden="true" />
-        {label}
-        <span className="sr-only"> for {item.exercise.name}</span>
+        {t(label)}
+        <span className="sr-only"> {t('for {name}', { name: item.exercise.name })}</span>
       </Button>
     );
 
   const timesLabel =
     item.timesPerDay > 1 ? (
       <span className="shrink-0 text-sm font-semibold text-slate-600">
-        {item.doneCount} of {item.timesPerDay} times
+        {t('{done} of {total} times', { done: item.doneCount, total: item.timesPerDay })}
       </span>
     ) : undefined;
 
@@ -57,10 +58,10 @@ export const TodayExerciseCard = ({
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-950">
           <span className="flex items-center gap-1.5 font-semibold">
             <XCircle className="h-4 w-4 text-amber-700" aria-hidden="true" />
-            Skipped today · {skip.reason}
+            {t('Skipped today')} · {t(skip.reason)}
           </span>
           <button type="button" onClick={() => undo.mutate(skip.id)} disabled={undo.isPending} className="font-semibold text-teal-800 underline disabled:opacity-60">
-            Undo<span className="sr-only"> skip for {item.exercise.name}</span>
+            {t('Undo')}<span className="sr-only"> {t('skip for {name}', { name: item.exercise.name })}</span>
           </button>
         </div>
       ) : done ? (
@@ -70,7 +71,7 @@ export const TodayExerciseCard = ({
           {status && timesLabel && <p className="text-center text-sm font-semibold text-slate-600">{timesLabel}</p>}
           <Button size="lg" className="w-full" onClick={() => setModal('complete')}>
             <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
-            Mark as done<span className="sr-only">: {item.exercise.name}</span>
+            {t('Mark as done')}<span className="sr-only">: {item.exercise.name}</span>
           </Button>
           {undoButton('Undo last tick')}
           <button
@@ -79,7 +80,7 @@ export const TodayExerciseCard = ({
             className="flex min-h-11 w-full items-center justify-center gap-1.5 text-sm font-bold text-teal-900 hover:underline"
           >
             <XCircle className="h-4 w-4" aria-hidden="true" />
-            I couldn’t do this today
+            {t('I couldn’t do this today')}
           </button>
         </div>
       )}

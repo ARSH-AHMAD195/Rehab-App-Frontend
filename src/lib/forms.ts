@@ -1,7 +1,21 @@
 import { useCallback, useState, type FormEvent } from 'react';
 import { ApiError, errorMessage } from '../services/api';
+import { isHindi, t } from './i18n';
 
 type FieldErrors = Record<string, string>;
+
+/** Browsers word validation messages in their own language, so Hindi needs its own wording. */
+const validationText = (el: HTMLInputElement) => {
+  const v = el.validity;
+  if (!isHindi()) return el.validationMessage;
+  if (v.valueMissing) return t('Please fill this in.');
+  if (v.rangeUnderflow) return t('Must be at least {n}.', { n: el.min });
+  if (v.rangeOverflow) return t('Must be at most {n}.', { n: el.max });
+  if (v.tooShort) return t('Must be at least {n} characters.', { n: el.minLength });
+  if (v.badInput || v.stepMismatch) return t('Please enter a valid number.');
+  if (v.patternMismatch || v.typeMismatch) return t('Please use the format shown.');
+  return el.validationMessage;
+};
 
 /**
  * Inline validation using the browser's own constraint rules (required, min, minLength,
@@ -18,7 +32,7 @@ export const useFormErrors = () => {
     let first: HTMLElement | null = null;
     for (const el of Array.from(form.elements) as HTMLInputElement[]) {
       if (!el.name || !el.willValidate || el.validity.valid) continue;
-      next[el.name] = el.validationMessage;
+      next[el.name] = validationText(el);
       first ??= el;
     }
     setErrors(next);
@@ -39,7 +53,7 @@ export const useFormErrors = () => {
   const fromApiError = useCallback((err: unknown, fallback?: string) => {
     const fieldErrors = err instanceof ApiError ? err.fieldErrors : {};
     setErrors(fieldErrors);
-    setFormError(Object.keys(fieldErrors).length ? 'Please correct the highlighted fields.' : errorMessage(err, fallback));
+    setFormError(Object.keys(fieldErrors).length ? t('Please correct the highlighted fields.') : errorMessage(err, fallback));
   }, []);
 
   /** Clears a field's message as soon as the user edits it. Spread onto <form>. */

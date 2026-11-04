@@ -6,6 +6,7 @@ import { qk } from '../../lib/queryClient';
 import { describeDays } from '../../lib/constants';
 import { formatDate, formatDateTime } from '../../lib/format';
 import { cn } from '../../lib/cn';
+import { t, useLang } from '../../lib/i18n';
 import { Card, EmptyState, ErrorState, PageHeader, PageLoader } from '../../components/ui';
 import { ExerciseCard } from '../../components/exercise/ExerciseCard';
 import { TodayExerciseCard } from '../../components/exercise/TodayExerciseCard';
@@ -24,6 +25,7 @@ const TabButton = ({ active, onClick, children }: { active: boolean; onClick: ()
 );
 
 export const PatientExercisesPage = () => {
+  useLang();
   const [view, setView] = useState<'plan' | 'history'>('plan');
 
   const plan = useQuery({ queryKey: qk.myPlan, queryFn: planService.getMine });
@@ -41,16 +43,16 @@ export const PatientExercisesPage = () => {
     <div className="space-y-6">
       <PageHeader
         title="My exercises"
-        description={assignedBy ? `Plan from ${assignedBy.name}, updated ${formatDate(updatedAt)}` : 'Follow the instructions and safety guidance from your surgical team'}
+        description={assignedBy ? t('Plan from {name}, updated {date}', { name: assignedBy.name, date: formatDate(updatedAt) }) : 'Follow the instructions and safety guidance from your surgical team'}
         actions={
           <div className="inline-flex rounded-2xl bg-slate-100 p-1">
             <TabButton active={view === 'plan'} onClick={() => setView('plan')}>
               <ListTodo className="h-4 w-4" aria-hidden="true" />
-              My plan
+              {t('My plan')}
             </TabButton>
             <TabButton active={view === 'history'} onClick={() => setView('history')}>
               <History className="h-4 w-4" aria-hidden="true" />
-              History
+              {t('History')}
             </TabButton>
           </div>
         }
@@ -58,7 +60,7 @@ export const PatientExercisesPage = () => {
 
       {view === 'history' ? (
         <Card>
-          <h2 className="mb-4 text-lg font-bold text-slate-900">The last 30 days</h2>
+          <h2 className="mb-4 text-lg font-bold text-slate-900">{t('The last 30 days')}</h2>
           {history.isPending ? (
             <PageLoader label="Loading your history…" />
           ) : history.isError ? (
@@ -99,7 +101,7 @@ const PlanCards = ({ items, checklist }: { items: PlanItem[]; checklist?: Checkl
         const schedule = (
           <span className="shrink-0 text-right text-sm font-semibold text-slate-600">
             {describeDays(item.schedule.daysOfWeek)}
-            {item.schedule.timesPerDay > 1 && <span className="block">{item.schedule.timesPerDay}× a day</span>}
+            {item.schedule.timesPerDay > 1 && <span className="block">{t('{n}× a day', { n: item.schedule.timesPerDay })}</span>}
           </span>
         );
         const todays = today.get(item.itemId);
@@ -112,7 +114,7 @@ const PlanCards = ({ items, checklist }: { items: PlanItem[]; checklist?: Checkl
           />
         ) : (
           <ExerciseCard key={item.itemId} exercise={item.exercise} target={item.target} notes={item.notes} status={schedule}>
-            <p className="rounded-xl bg-slate-50 p-3 text-center text-sm text-slate-600">Not planned for today</p>
+            <p className="rounded-xl bg-slate-50 p-3 text-center text-sm text-slate-600">{t('Not planned for today')}</p>
           </ExerciseCard>
         );
       })}

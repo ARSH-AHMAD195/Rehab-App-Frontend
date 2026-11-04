@@ -1,10 +1,11 @@
 import { CalendarDays } from 'lucide-react';
 import { programmeProgress } from '../../lib/programme';
 import { cn } from '../../lib/cn';
+import { locale, t } from '../../lib/i18n';
 
 // Design: example/README.md ("Program Progress Card"). Dates read the British way: "Tue 27 October".
-const shortDate = (d: Date) => d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long' });
-const longDate = (d: Date) => d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+const shortDate = (d: Date) => d.toLocaleDateString(locale() ?? 'en-GB', { weekday: 'short', day: 'numeric', month: 'long' });
+const longDate = (d: Date) => d.toLocaleDateString(locale() ?? 'en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 
 export type ProgramProgressCardProps = {
   /** 1-based day of the programme; clamped to 1…totalDays */
@@ -20,7 +21,7 @@ export type ProgramProgressCardProps = {
 export const ProgramProgressCard = ({ currentDay, totalDays, surgeryDate, daysPerWeek = 7, onPress }: ProgramProgressCardProps) => {
   const { day, totalDays: total, week, weeks, fills } = programmeProgress(currentDay, totalDays, daysPerWeek);
   // Screen readers get one sentence; the bar and icon are decorative
-  const label = `Week ${week} of ${weeks}, day ${day} of ${total}.${surgeryDate ? ` Surgery planned for ${longDate(surgeryDate)}.` : ''}`;
+  const label = `${t('Week {week} of {weeks}, day {day} of {total}.', { week, weeks, day, total })}${surgeryDate ? ` ${t('Surgery planned for {date}.', { date: longDate(surgeryDate) })}` : ''}`;
   const Root = onPress ? 'button' : 'section';
 
   return (
@@ -39,10 +40,10 @@ export const ProgramProgressCard = ({ currentDay, totalDays, surgeryDate, daysPe
         {/* Wraps instead of truncating when the system font is scaled up */}
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           <span className="text-xl font-bold leading-tight">
-            Week {week} of {weeks}
+            {t('Week {week} of {weeks}', { week, weeks })}
           </span>
           <span className="text-[17px] leading-tight text-ffs-ink-muted">
-            Day {day} of {total}
+            {t('Day {day} of {total}', { day, total })}
           </span>
         </div>
 
@@ -57,7 +58,7 @@ export const ProgramProgressCard = ({ currentDay, totalDays, surgeryDate, daysPe
         {surgeryDate && (
           <p className="mt-3.5 flex items-center gap-2 text-[17px] leading-snug text-ffs-ink-muted">
             <CalendarDays className="h-[22px] w-[22px] shrink-0 text-ffs-primary" />
-            <span>Surgery planned for {shortDate(surgeryDate)}</span>
+            <span>{t('Surgery planned for {date}', { date: shortDate(surgeryDate) })}</span>
           </p>
         )}
       </div>

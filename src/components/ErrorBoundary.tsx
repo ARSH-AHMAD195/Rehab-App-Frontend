@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react';
+import { t } from '../lib/i18n';
 import { reportError } from '../lib/monitoring';
 
 /** Catches render errors so one broken widget can't blank the whole app. */
@@ -19,14 +20,14 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: E
     return (
       <div role="alert" className="mx-auto my-12 max-w-md rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
         <AlertTriangle className="mx-auto h-8 w-8 text-amber-600" aria-hidden="true" />
-        <h2 className="mt-3 text-lg font-bold text-slate-900">Something went wrong</h2>
-        <p className="mt-1 text-sm text-slate-600">An unexpected error occurred while displaying this page. Your saved data is not affected.</p>
+        <h2 className="mt-3 text-lg font-bold text-slate-900">{t('Something went wrong')}</h2>
+        <p className="mt-1 text-sm text-slate-600">{t('An unexpected error occurred while displaying this page. Your saved data is not affected.')}</p>
         <button
           type="button"
           onClick={() => window.location.reload()}
           className="mt-4 rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-800"
         >
-          Reload page
+          {t('Reload page')}
         </button>
       </div>
     );
