@@ -6,12 +6,10 @@ import { ApiError, errorMessage } from '../../services/api';
 import { qk } from '../../lib/queryClient';
 import { describeDays } from '../../lib/constants';
 import { useFormErrors } from '../../lib/forms';
-import { describeTarget } from '../../lib/format';
+import { describeTarget, toTarget } from '../../lib/format';
 import { Alert, Badge, Button, Field, Input } from '../ui';
 import { useToast } from '../ui/toast';
 import type { Plan, PlanItem } from '../../types/api';
-
-const num = (s: string) => (s.trim() ? Number(s) : null);
 
 /** One exercise in a patient's plan. Sets, reps and minutes can be changed right on the card. */
 export const PlanItemCard = ({ patientId, plan, item }: { patientId: string; plan: Plan; item: PlanItem }) => {
@@ -30,7 +28,7 @@ export const PlanItemCard = ({ patientId, plan, item }: { patientId: string; pla
   // The API replaces the whole plan, so send every item with just this one's target changed
   const save = useMutation({
     mutationFn: () => {
-      const target = t.sets || t.reps || t.durationMin ? { sets: num(t.sets), reps: num(t.reps), durationMin: num(t.durationMin) } : null;
+      const target = toTarget(t);
       return planService.save(
         patientId,
         plan.version,
@@ -57,9 +55,9 @@ export const PlanItemCard = ({ patientId, plan, item }: { patientId: string; pla
     if (form.validate(e.currentTarget)) save.mutate();
   };
 
-  const input = (key: keyof typeof t, label: string, max: number) => (
+  const input = (key: keyof typeof t, label: string, min: number, max: number) => (
     <Field label={label} error={form.errors[key]}>
-      <Input name={key} type="number" inputMode="numeric" min="1" max={max} value={t[key]} onChange={(e) => setT((s) => ({ ...s, [key]: e.target.value }))} />
+      <Input name={key} type="number" inputMode="numeric" min={min} max={max} value={t[key]} onChange={(e) => setT((s) => ({ ...s, [key]: e.target.value }))} />
     </Field>
   );
 
@@ -86,9 +84,9 @@ export const PlanItemCard = ({ patientId, plan, item }: { patientId: string; pla
         <form noValidate onSubmit={handleSubmit} onChange={form.onChange} className="mt-3 space-y-3">
           {form.formError && <Alert tone="error">{form.formError}</Alert>}
           <div className="grid grid-cols-3 gap-2">
-            {input('sets', 'Sets', 20)}
-            {input('reps', 'Reps', 100)}
-            {input('durationMin', 'Minutes', 240)}
+            {input('sets', 'Sets', 0, 20)}
+            {input('reps', 'Reps', 0, 100)}
+            {input('durationMin', 'Minutes', 1, 240)}
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" size="sm" onClick={() => setEditing(false)}>

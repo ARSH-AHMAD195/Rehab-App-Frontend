@@ -6,7 +6,7 @@ import { patientService } from '../../services/apiServices';
 import { qk } from '../../lib/queryClient';
 import { useDebouncedValue } from '../../lib/hooks';
 import { formatDate } from '../../lib/format';
-import { Badge, Button, ErrorState, Input, PageHeader, buttonClass } from '../../components/ui';
+import { Badge, Button, ErrorState, Input, PageHeader, ScrollX, buttonClass } from '../../components/ui';
 
 const PAGE_SIZE = 20;
 
@@ -54,8 +54,8 @@ export const DoctorPatientsPage = () => {
       {result.isError && !result.data ? (
         <ErrorState error={result.error} onRetry={() => void result.refetch()} />
       ) : (
-        <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-          <div className="overflow-x-auto" aria-busy={result.isFetching}>
+        <div className="overflow-clip rounded-3xl border border-slate-200 bg-white shadow-sm">
+          <ScrollX aria-busy={result.isFetching}>
             <table className="w-full text-left text-sm">
               <thead className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-600">
                 <tr>
@@ -104,7 +104,7 @@ export const DoctorPatientsPage = () => {
                 )}
               </tbody>
             </table>
-          </div>
+          </ScrollX>
 
           {(cursors.length > 1 || result.data?.nextCursor) && (
             <div className="flex items-center justify-between border-t border-slate-200 p-4 text-sm text-slate-700">

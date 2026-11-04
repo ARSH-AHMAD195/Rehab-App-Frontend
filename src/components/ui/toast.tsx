@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AlertCircle, CheckCircle2, Info, X, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/cn';
+import { t } from '../../lib/i18n';
 
 type Tone = 'success' | 'error' | 'info';
 type ToastApi = Record<Tone, (message: string) => void>;
@@ -51,7 +52,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
             >
               <Icon className={cn('mt-0.5 h-5 w-5 shrink-0', iconColor)} aria-hidden="true" />
               <p className="flex-1 leading-relaxed">{message}</p>
-              <button type="button" onClick={() => dismiss(id)} aria-label="Dismiss notification" className="rounded p-1 text-slate-600 hover:text-slate-900">
+              <button type="button" onClick={() => dismiss(id)} aria-label={t('Dismiss notification')} className="rounded p-1 text-slate-600 hover:text-slate-900">
                 <X className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>

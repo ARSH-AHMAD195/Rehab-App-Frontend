@@ -1,4 +1,5 @@
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { t } from '../../lib/i18n';
 import { Badge, Card } from '../ui';
 
 const TOOLTIP_STYLE = { backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '13px' };
@@ -70,7 +71,7 @@ export const TrendChart = ({
             </Chart>
           </ResponsiveContainer>
         ) : (
-          <div className="flex h-full items-center justify-center text-sm text-slate-600">No readings in this period yet.</div>
+          <div className="flex h-full items-center justify-center text-sm text-slate-600">{t('No readings in this period yet.')}</div>
         )}
       </div>
     </Card>

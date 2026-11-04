@@ -3,6 +3,7 @@
 // Every request carries the signed-in user's Firebase ID token as a Bearer token; the
 // Firebase SDK keeps it fresh. The APIs work out who the user is from that token alone.
 import type { ErrorBody } from '../types/api';
+import { t } from '../lib/i18n';
 import { firebaseAuth } from '../lib/firebase';
 
 const base = (url: string | undefined) => (url || '').replace(/\/$/, '');
@@ -113,4 +114,4 @@ const FRIENDLY: Record<string, string> = {
 };
 
 export const errorMessage = (err: unknown, fallback = 'Something went wrong. Please try again.') =>
-  err instanceof ApiError ? (FRIENDLY[err.code] ?? err.message) : fallback;
+  t(err instanceof ApiError ? (FRIENDLY[err.code] ?? err.message) : fallback);

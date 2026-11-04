@@ -14,7 +14,7 @@ const accounts = {
 const PAGES = {
   patient: ['/patient/dashboard', '/patient/exercises', '/patient/health-tracker', '/patient/profile'],
   doctor: ['/doctor/dashboard', '/doctor/patients', '/doctor/exercises', '/doctor/onboard-patient'],
-  admin: ['/admin/dashboard', '/admin/doctors', '/admin/exercises'],
+  admin: ['/admin/dashboard', '/admin/patients', '/admin/doctors', '/admin/exercises'],
 } as const;
 
 const ERROR_TEXT = /couldn’t load|could not be loaded|something went wrong|unavailable/i;

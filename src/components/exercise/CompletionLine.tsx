@@ -1,4 +1,5 @@
 import { CheckCircle2, XCircle } from 'lucide-react';
+import { t } from '../../lib/i18n';
 import type { Completion } from '../../types/api';
 
 /** One tick or skip: a green tick with minutes and note, or an amber cross with the skip reason. */
@@ -6,8 +7,8 @@ export const CompletionLine = ({ completion: c, when }: { completion: Completion
   const skipped = c.status === 'SKIPPED';
   const Icon = skipped ? XCircle : CheckCircle2;
   const detail = skipped
-    ? ` · Skipped${c.reason ? `: “${c.reason}”` : ''}`
-    : `${c.details?.durationMin ? ` · ${c.details.durationMin} min` : ''}${c.details?.note ? ` · “${c.details.note}”` : ''}`;
+    ? ` · ${t('Skipped')}${c.reason ? `: “${t(c.reason)}”` : ''}`
+    : `${c.details?.durationMin ? ` · ${c.details.durationMin} ${t('min')}` : ''}${c.details?.note ? ` · “${c.details.note}”` : ''}`;
   return (
     <span className="flex items-start gap-1.5">
       <Icon className={skipped ? 'mt-0.5 h-4 w-4 shrink-0 text-amber-700' : 'mt-0.5 h-4 w-4 shrink-0 text-emerald-700'} aria-hidden="true" />

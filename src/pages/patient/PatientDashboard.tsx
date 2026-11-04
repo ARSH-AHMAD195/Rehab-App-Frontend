@@ -9,6 +9,7 @@ import { Card, EmptyState, ErrorState, PageLoader, SectionTitle, buttonClass } f
 import { TodayExerciseCard } from '../../components/exercise/TodayExerciseCard';
 import { ProgramProgressCard } from '../../components/patient/ProgramProgressCard';
 import { programmeFor } from '../../lib/programme';
+import { t, useLang } from '../../lib/i18n';
 import type { Checklist, ChecklistItem, Reading, VitalType } from '../../types/api';
 
 const TILES: { type: VitalType; label: string }[] = [
@@ -33,7 +34,7 @@ const VitalTile = ({ label, reading }: { label: string; reading?: Reading }) => 
         <p className="mt-1 text-2xl font-bold text-slate-400" aria-hidden="true">
           —
         </p>
-        <span className="mt-1 block text-xs text-slate-600">Not logged today</span>
+        <span className="mt-1 block text-xs text-slate-600">{t('Not logged today')}</span>
       </>
     )}
   </div>
@@ -52,15 +53,15 @@ const TodayExercises = ({ checklist }: { checklist: Checklist }) => {
     <section className="space-y-4">
       <div>
         <h2 className="text-lg font-bold text-slate-900">
-          Today’s exercises
+          {t('Today’s exercises')}
         </h2>
         <p className="text-sm text-slate-700">
-          {plannedCount === 0 ? 'Nothing planned for today' : doneCount >= plannedCount ? 'All done for today. Great work!' : `${doneCount} of ${plannedCount} done`}
+          {plannedCount === 0 ? t('Nothing planned for today') : doneCount >= plannedCount ? t('All done for today. Great work!') : t('{done} of {planned} done', { done: doneCount, planned: plannedCount })}
         </p>
       </div>
 
       {plannedCount > 0 && (
-        <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label="Today's exercises completed">
+        <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label={t('Today’s exercises')}>
           <div className="h-3 rounded-full bg-teal-700 transition-all duration-500" style={{ width: `${progress}%` }} />
         </div>
       )}
@@ -85,6 +86,7 @@ const TodayExercises = ({ checklist }: { checklist: Checklist }) => {
 };
 
 export const PatientDashboard = () => {
+  useLang();
   const user = useSignedInUser();
 
   const profile = useQuery({ queryKey: qk.myProfile, queryFn: profileService.getMine });
@@ -109,13 +111,13 @@ export const PatientDashboard = () => {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
-            {greeting()}, {firstName(user.name)}
+            {t(greeting())}, {firstName(user.name)}
           </h1>
           <p className="mt-1 text-base text-slate-700">{formatDate(new Date(), { weekday: 'long', day: 'numeric', month: 'long' })}</p>
         </div>
         <Link to="/patient/health-tracker" className={buttonClass('primary', 'md', 'hidden lg:inline-flex')}>
           <Plus className="h-4 w-4" aria-hidden="true" />
-          Log vitals
+          {t('Log vitals')}
         </Link>
       </header>
 
@@ -126,7 +128,7 @@ export const PatientDashboard = () => {
             <ProgramProgressCard currentDay={programme.currentDay} totalDays={programme.totalDays} surgeryDate={surgeryDate ? fromDateKey(surgeryDate) : null} />
           ) : (
             <p className="rounded-2xl border border-ffs-border bg-ffs-surface p-[18px] text-[17px] text-ffs-ink">
-              Your {programme.totalDays}-day programme starts on <strong>{formatDate(programme.start, { weekday: 'long', day: 'numeric', month: 'long' })}</strong>.
+              {t('Your {n}-day programme starts on {date}.', { n: programme.totalDays, date: formatDate(programme.start, { weekday: 'long', day: 'numeric', month: 'long' }) })}
             </p>
           )}
         </div>
@@ -137,15 +139,15 @@ export const PatientDashboard = () => {
       <section aria-labelledby="latest-vitals">
         <div className="mb-3 flex items-center justify-between">
           <h2 id="latest-vitals" className="text-lg font-bold text-slate-900">
-            Today’s readings
+            {t('Today’s readings')}
           </h2>
           <Link to="/patient/health-tracker" className="text-sm font-semibold text-teal-800 hover:underline">
-            Log & charts →
+            {t('Log & charts →')}
           </Link>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {TILES.map((t) => (
-            <VitalTile key={t.type} label={t.label} reading={today.data?.readings[t.type]} />
+          {TILES.map((tile) => (
+            <VitalTile key={tile.type} label={t(tile.label)} reading={today.data?.readings[tile.type]} />
           ))}
         </div>
       </section>
@@ -157,8 +159,8 @@ export const PatientDashboard = () => {
             <Stethoscope className="h-6 w-6" aria-hidden="true" />
           </div>
           <div>
-            <p className="text-base font-bold text-slate-900">{doctors.length ? doctors.map((d) => d.name).join(', ') : 'Not yet assigned'}</p>
-            <p className="text-sm text-slate-600">{medical.data?.plannedSurgery ?? 'Procedure not recorded yet'}</p>
+            <p className="text-base font-bold text-slate-900">{doctors.length ? doctors.map((d) => d.name).join(', ') : t('Not yet assigned')}</p>
+            <p className="text-sm text-slate-600">{medical.data?.plannedSurgery ?? t('Procedure not recorded yet')}</p>
           </div>
         </div>
       </Card>
@@ -169,7 +171,7 @@ export const PatientDashboard = () => {
         className={buttonClass('primary', 'lg', 'fixed bottom-[calc(5.75rem+env(safe-area-inset-bottom))] right-4 z-30 rounded-full px-5 shadow-lg lg:hidden')}
       >
         <Plus className="h-5 w-5" aria-hidden="true" />
-        Log vitals
+        {t('Log vitals')}
       </Link>
     </div>
   );

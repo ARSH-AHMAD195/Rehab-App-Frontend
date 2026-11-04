@@ -5,7 +5,7 @@ import { exerciseService } from '../../services/apiServices';
 import { errorMessage } from '../../services/api';
 import { qk } from '../../lib/queryClient';
 import { labelize } from '../../lib/format';
-import { Badge, Button, ConfirmDialog, ErrorState, PageHeader, PageLoader } from '../../components/ui';
+import { Badge, Button, ConfirmDialog, ErrorState, PageHeader, PageLoader, ScrollX } from '../../components/ui';
 import { ExerciseFormModal } from '../../components/exercise/ExerciseFormModal';
 import { useToast } from '../../components/ui/toast';
 import type { Exercise } from '../../types/api';
@@ -46,8 +46,8 @@ export const AdminExercisesPage = () => {
         }
       />
 
-      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
+      <div className="overflow-clip rounded-3xl border border-slate-200 bg-white shadow-sm">
+        <ScrollX>
           <table className="w-full text-left text-sm">
             <thead className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-600">
               <tr>
@@ -104,7 +104,7 @@ export const AdminExercisesPage = () => {
               )}
             </tbody>
           </table>
-        </div>
+        </ScrollX>
       </div>
 
       {editing && <ExerciseFormModal exercise={editing === 'new' ? undefined : editing} categories={categories.data} onClose={() => setEditing(null)} />}

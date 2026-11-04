@@ -5,6 +5,7 @@ import { completionService } from '../../services/apiServices';
 import { ApiError } from '../../services/api';
 import { useFormErrors } from '../../lib/forms';
 import { cn } from '../../lib/cn';
+import { t } from '../../lib/i18n';
 import { Alert, Field, Input, Modal, ModalActions } from '../ui';
 import { useToast } from '../ui/toast';
 import type { ChecklistItem } from '../../types/api';
@@ -25,7 +26,7 @@ export const SkipExerciseModal = ({ item, date, onClose }: { item: ChecklistItem
     mutationFn: () =>
       completionService.complete({ itemId: item.itemId, date, status: 'SKIPPED', reason: reason === 'Other' ? other.trim() || 'Other' : reason }, idempotencyKey),
     onSuccess: () => {
-      toast.success(`"${item.exercise.name}" skipped for today. Your care team can see why.`);
+      toast.success(t('"{name}" skipped for today. Your care team can see why.', { name: item.exercise.name }));
       void queryClient.invalidateQueries({ queryKey: ['my'] });
       onClose();
     },
@@ -48,7 +49,7 @@ export const SkipExerciseModal = ({ item, date, onClose }: { item: ChecklistItem
       <form noValidate onSubmit={handleSubmit} onChange={form.onChange} className="space-y-4">
         {form.formError && <Alert tone="error">{form.formError}</Alert>}
         <fieldset>
-          <legend className="mb-2 text-sm font-semibold text-slate-800">What got in the way?</legend>
+          <legend className="mb-2 text-sm font-semibold text-slate-800">{t('What got in the way?')}</legend>
           <div className="grid gap-2">
             {REASONS.map((r) => (
               <label key={r} className="cursor-pointer">
@@ -60,7 +61,7 @@ export const SkipExerciseModal = ({ item, date, onClose }: { item: ChecklistItem
                     reason === r ? 'border-teal-700 bg-teal-50 text-teal-950' : 'border-slate-200 bg-white text-slate-800'
                   )}
                 >
-                  {r}
+                  {t(r)}
                 </span>
               </label>
             ))}
@@ -71,7 +72,7 @@ export const SkipExerciseModal = ({ item, date, onClose }: { item: ChecklistItem
             <Input name="reason" maxLength={500} value={other} onChange={(e) => setOther(e.target.value)} />
           </Field>
         )}
-        <p className="text-sm text-slate-600">Your care team will see this and your reason. Tell them if it keeps happening, or if you have pain.</p>
+        <p className="text-sm text-slate-600">{t('Your care team will see this and your reason. Tell them if it keeps happening, or if you have pain.')}</p>
         <ModalActions onCancel={onClose} submitLabel="Skip for today" submitIcon={XCircle} loading={skip.isPending} />
       </form>
     </Modal>

@@ -8,6 +8,7 @@ import { qk } from '../../lib/queryClient';
 import { useFormErrors } from '../../lib/forms';
 import { PHONE_HINT, PHONE_PATTERN } from '../../lib/constants';
 import { formatDate, labelize } from '../../lib/format';
+import { t, useLang } from '../../lib/i18n';
 import { Alert, Button, Card, ErrorState, Field, Input, PageHeader, PageLoader, SectionTitle } from '../../components/ui';
 import { useToast } from '../../components/ui/toast';
 import { UnsavedChangesGuard } from '../../components/UnsavedChangesGuard';
@@ -15,7 +16,7 @@ import type { EmergencyContact, MedicalProfile, Profile } from '../../types/api'
 
 const Detail = ({ label, value }: { label: string; value: string | null | undefined }) => (
   <div>
-    <dt className="text-sm font-semibold text-slate-600">{label}</dt>
+    <dt className="text-sm font-semibold text-slate-600">{t(label)}</dt>
     <dd className="text-base text-slate-900">{value || '—'}</dd>
   </div>
 );
@@ -25,6 +26,7 @@ type ProfileForm = { name: string; phone: string; contact: EmergencyContact };
 const formOf = (p: Profile, m: MedicalProfile): ProfileForm => ({ name: p.name, phone: p.phone ?? '', contact: m.emergencyContact ?? EMPTY_CONTACT });
 
 export const PatientProfilePage = () => {
+  useLang();
   const toast = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -52,7 +54,7 @@ export const PatientProfilePage = () => {
       }
     },
     onSuccess: async () => {
-      toast.success('Your details have been updated.');
+      toast.success(t('Your details have been updated.'));
       await queryClient.invalidateQueries({ queryKey: ['my'] });
       setDraft(null);
     },
@@ -80,9 +82,9 @@ export const PatientProfilePage = () => {
         <SectionTitle title="Medical & surgical details" description="Recorded by your care team. To correct any of these, contact them." />
         <dl className="grid gap-4 sm:grid-cols-2">
           <Detail label="Email" value={p.email} />
-          <Detail label="Care team" value={p.doctors?.map((d) => d.name).join(', ') || 'Not yet assigned'} />
+          <Detail label="Care team" value={p.doctors?.map((d) => d.name).join(', ') || t('Not yet assigned')} />
           <Detail label="Date of birth" value={m.dateOfBirth && formatDate(m.dateOfBirth)} />
-          <Detail label="Sex" value={m.sex && labelize(m.sex)} />
+          <Detail label="Sex" value={m.sex && t(labelize(m.sex))} />
           <Detail label="Planned surgery" value={m.plannedSurgery} />
           <Detail label="Surgery date" value={m.plannedSurgeryDate && formatDate(m.plannedSurgeryDate)} />
           <Detail label="Diagnosis" value={m.diagnosis} />
@@ -107,13 +109,13 @@ export const PatientProfilePage = () => {
           </div>
 
           <fieldset className="space-y-4 rounded-2xl border border-slate-200 p-4">
-            <legend className="px-1 text-base font-bold text-slate-900">Emergency contact</legend>
+            <legend className="px-1 text-base font-bold text-slate-900">{t('Emergency contact')}</legend>
             <div className="grid gap-4 sm:grid-cols-3">
               <Field label="Name" error={form.errors['emergencyContact.name']}>
                 <Input name="emergencyContact.name" required={contactRequired} maxLength={100} autoComplete="off" value={f.contact.name} onChange={setContact('name')} />
               </Field>
               <Field label="Relationship" error={form.errors['emergencyContact.relation']}>
-                <Input name="emergencyContact.relation" required={contactRequired} maxLength={50} value={f.contact.relation} onChange={setContact('relation')} placeholder="e.g. Spouse" />
+                <Input name="emergencyContact.relation" required={contactRequired} maxLength={50} value={f.contact.relation} onChange={setContact('relation')} placeholder={t('e.g. Spouse')} />
               </Field>
               <Field label="Phone" hint={PHONE_HINT} error={form.errors['emergencyContact.phone']}>
                 <Input name="emergencyContact.phone" type="tel" required={contactRequired} pattern={PHONE_PATTERN} value={f.contact.phone} onChange={setContact('phone')} />
@@ -123,18 +125,18 @@ export const PatientProfilePage = () => {
 
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Link to="/forgot-password" className="text-sm font-semibold text-teal-800 hover:underline">
-              Change my password
+              {t('Change my password')}
             </Link>
             <Button type="submit" loading={save.isPending} disabled={!dirty}>
               <Check className="h-4 w-4" aria-hidden="true" />
-              Save changes
+              {t('Save changes')}
             </Button>
           </div>
         </form>
       </Card>
 
       <Card className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-slate-700">Using a shared device? Sign out when you’re done.</p>
+        <p className="text-sm text-slate-700">{t('Using a shared device? Sign out when you’re done.')}</p>
         <Button
           variant="danger"
           onClick={async () => {
@@ -143,7 +145,7 @@ export const PatientProfilePage = () => {
           }}
         >
           <LogOut className="h-4 w-4" aria-hidden="true" />
-          Sign out
+          {t('Sign out')}
         </Button>
       </Card>
 

@@ -5,13 +5,15 @@ import {
   useEffect,
   useId,
   useRef,
+  useState,
   type ComponentProps,
   type ReactElement,
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertCircle, AlertTriangle, Check, CheckCircle2, Info, RefreshCw, X, type LucideIcon } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Check, CheckCircle2, ChevronLeft, ChevronRight, Info, RefreshCw, X, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/cn';
+import { t, tx } from '../../lib/i18n';
 import { errorMessage } from '../../services/api';
 
 // Contrast note: text uses slate-600 or darker and teal-700 or darker on white (WCAG AA 4.5:1).
@@ -74,8 +76,8 @@ export const Card = ({ className, children, ...props }: ComponentProps<'section'
 export const PageHeader = ({ title, description, actions }: { title: ReactNode; description?: ReactNode; actions?: ReactNode }) => (
   <div className="flex flex-col justify-between gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-xs sm:flex-row sm:items-center sm:p-6">
     <div>
-      <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">{title}</h1>
-      {description && <p className="mt-1 text-sm text-slate-600">{description}</p>}
+      <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">{tx(title)}</h1>
+      {description && <p className="mt-1 text-sm text-slate-600">{tx(description)}</p>}
     </div>
     {actions && <div className="flex flex-wrap items-center gap-3">{actions}</div>}
   </div>
@@ -94,8 +96,8 @@ export const SectionTitle = ({
 }) => (
   <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
     <div>
-      <Heading className="text-lg font-bold text-slate-900">{title}</Heading>
-      {description && <p className="text-sm text-slate-600">{description}</p>}
+      <Heading className="text-lg font-bold text-slate-900">{tx(title)}</Heading>
+      {description && <p className="text-sm text-slate-600">{tx(description)}</p>}
     </div>
     {actions}
   </div>
@@ -108,6 +110,54 @@ export const StatCard = ({ label, value, hint, tone = 'default' }: { label: stri
     {hint && <span className="mt-1 block text-xs text-slate-600">{hint}</span>}
   </div>
 );
+
+/**
+ * A sideways-scrolling area with an arrow on each side that has more to see. The arrows ignore taps
+ * and stay on screen beside tall tables, so a parent must clip with overflow-clip, not overflow-hidden.
+ */
+export const ScrollX = ({ className, children, ...props }: ComponentProps<'div'>) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const [more, setMore] = useState({ left: false, right: false });
+
+  useEffect(() => {
+    const el = ref.current!;
+    const update = () => {
+      // 1px of slack: scroll positions can be fractional on scaled screens
+      const left = el.scrollLeft > 1;
+      const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+      setMore((m) => (m.left === left && m.right === right ? m : { left, right }));
+    };
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    // Also re-check when the box or its content changes size, e.g. once a table's rows load
+    const resize = new ResizeObserver(update);
+    resize.observe(el);
+    Array.from(el.children).forEach((c) => resize.observe(c));
+    return () => {
+      el.removeEventListener('scroll', update);
+      resize.disconnect();
+    };
+  }, []);
+
+  const arrow = (side: 'left' | 'right', Icon: LucideIcon) => (
+    <div className={cn('pointer-events-none absolute inset-y-0 z-10 flex flex-col justify-center', side === 'left' ? 'left-1' : 'right-1')} aria-hidden="true">
+      {/* Kept between the page header and the floating navbar */}
+      <span className="sticky bottom-24 top-20 flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-teal-800 shadow-md">
+        <Icon className="h-4 w-4" />
+      </span>
+    </div>
+  );
+
+  return (
+    <div className="relative">
+      <div ref={ref} className={cn('overflow-x-auto', className)} {...props}>
+        {children}
+      </div>
+      {more.left && arrow('left', ChevronLeft)}
+      {more.right && arrow('right', ChevronRight)}
+    </div>
+  );
+};
 
 const BADGE_TONES = {
   slate: 'bg-slate-100 text-slate-800',
@@ -149,7 +199,7 @@ export const Field = ({ label, hint, error, className, children }: FieldProps) =
   return (
     <div className={className}>
       <label className="block">
-        <span className="mb-1.5 block text-sm font-semibold text-slate-800">{label}</span>
+        <span className="mb-1.5 block text-sm font-semibold text-slate-800">{tx(label)}</span>
         {control}
       </label>
       {error && (
@@ -160,7 +210,7 @@ export const Field = ({ label, hint, error, className, children }: FieldProps) =
       )}
       {hint && (
         <p id={hintId} className="mt-1 text-xs text-slate-600">
-          {hint}
+          {tx(hint)}
         </p>
       )}
     </div>
@@ -200,8 +250,8 @@ export const Alert = ({
     <div role={tone === 'error' ? 'alert' : 'status'} className={cn('flex items-start gap-2.5 rounded-xl border p-3.5 text-sm', styles, className)}>
       <Icon className={cn('mt-0.5 h-5 w-5 shrink-0', iconColor)} aria-hidden="true" />
       <div>
-        {title && <strong className="block font-bold">{title}</strong>}
-        <div className="leading-relaxed">{children}</div>
+        {title && <strong className="block font-bold">{tx(title)}</strong>}
+        <div className="leading-relaxed">{tx(children)}</div>
       </div>
     </div>
   );
@@ -214,26 +264,26 @@ export const Spinner = ({ className }: { className?: string }) => (
 export const PageLoader = ({ label = 'Loading…' }: { label?: string }) => (
   <div role="status" className="flex flex-col items-center justify-center py-20">
     <Spinner />
-    <p className="mt-3 text-sm text-slate-600">{label}</p>
+    <p className="mt-3 text-sm text-slate-600">{t(label)}</p>
   </div>
 );
 
 export const ErrorState = ({ error, onRetry, title = 'We couldn’t load this page' }: { error: unknown; onRetry?: () => void; title?: string }) => (
   <div role="alert" className="rounded-3xl border border-rose-200 bg-white p-8 text-center shadow-sm">
     <AlertCircle className="mx-auto h-8 w-8 text-rose-600" aria-hidden="true" />
-    <h2 className="mt-3 text-base font-bold text-slate-900">{title}</h2>
+    <h2 className="mt-3 text-base font-bold text-slate-900">{t(title)}</h2>
     <p className="mt-1 text-sm text-slate-600">{errorMessage(error)}</p>
     {onRetry && (
       <Button variant="secondary" size="sm" className="mt-4" onClick={onRetry}>
         <RefreshCw className="h-4 w-4" aria-hidden="true" />
-        Try again
+        {t('Try again')}
       </Button>
     )}
   </div>
 );
 
 export const EmptyState = ({ className, children }: { className?: string; children: ReactNode }) => (
-  <p className={cn('py-8 text-center text-sm text-slate-600', className)}>{children}</p>
+  <p className={cn('py-8 text-center text-sm text-slate-600', className)}>{tx(children)}</p>
 );
 
 // ---------- Dialogs ----------
@@ -302,16 +352,16 @@ export const Modal = ({ title, description, onClose, size = 'md', children }: Mo
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close dialog"
+            aria-label={t('Close dialog')}
             className="absolute right-3 top-3 rounded-lg p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
           >
             <X className="h-5 w-5" aria-hidden="true" />
           </button>
         )}
         <h2 id={titleId} className="pr-10 text-lg font-bold text-slate-900">
-          {title}
+          {tx(title)}
         </h2>
-        {description && <p className="mt-1 text-sm text-slate-600">{description}</p>}
+        {description && <p className="mt-1 text-sm text-slate-600">{tx(description)}</p>}
         <div className="mt-4">{children}</div>
       </div>
     </div>,
@@ -336,11 +386,11 @@ export const ModalActions = ({
 }) => (
   <div className="flex gap-3 pt-2">
     <Button variant="secondary" className="flex-1" onClick={onCancel}>
-      {cancelLabel}
+      {t(cancelLabel)}
     </Button>
     <Button type="submit" variant={submitVariant} className="flex-1" loading={loading}>
       <SubmitIcon className="h-4 w-4" aria-hidden="true" />
-      {submitLabel}
+      {t(submitLabel)}
     </Button>
   </div>
 );
@@ -371,7 +421,7 @@ export const ConfirmDialog = ({
         onConfirm();
       }}
     >
-      <div className="text-sm text-slate-700">{message}</div>
+      <div className="text-sm text-slate-700">{tx(message)}</div>
       <div className="mt-4">
         <ModalActions
           onCancel={onCancel}

@@ -30,7 +30,7 @@ type TabKey = (typeof TAB_IDS)[number];
 const Detail = ({ label, children, className }: { label: string; children: ReactNode; className?: string }) => (
   <div className={className}>
     <dt className="text-xs font-bold uppercase text-slate-600">{label}</dt>
-    <dd className="mt-0.5 font-semibold text-slate-900">{children || '—'}</dd>
+    <dd className="mt-0.5 font-semibold text-slate-900 [overflow-wrap:anywhere]">{children || '—'}</dd>
   </div>
 );
 
@@ -421,13 +421,13 @@ export const DoctorPatientDetailPage = () => {
         <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
           <div className="flex items-start gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-teal-100 text-lg font-extrabold text-teal-900">{initials(p.name)}</div>
-            <div>
+            <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">{p.name}</h1>
                 <SurgeryCountdown surgeryDate={m?.plannedSurgeryDate} />
                 {!p.active && <Badge tone="rose">Deactivated</Badge>}
               </div>
-              <p className="text-sm text-slate-700">{[m?.plannedSurgery, m?.plannedSurgeryDate && formatDate(m.plannedSurgeryDate), p.email].filter(Boolean).join(' · ')}</p>
+              <p className="text-sm text-slate-700 [overflow-wrap:anywhere]">{[m?.plannedSurgery, m?.plannedSurgeryDate && formatDate(m.plannedSurgeryDate), p.email].filter(Boolean).join(' · ')}</p>
             </div>
           </div>
           <Button size="sm" onClick={() => setModal('plan')} disabled={!plan.data}>

@@ -1,4 +1,5 @@
 import type { ReadingValue, Target } from '../types/api';
+import { locale } from './i18n';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -20,12 +21,12 @@ export const labelize = (value: string | null | undefined = '') =>
 
 export const formatDate = (value: DateInput, options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' }) => {
   const d = toDate(value);
-  return d ? d.toLocaleDateString(undefined, options) : '—';
+  return d ? d.toLocaleDateString(locale(), options) : '—';
 };
 
 export const formatDateTime = (value: DateInput) => {
   const d = toDate(value);
-  return d ? d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+  return d ? d.toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
 };
 
 /** Whole calendar days from today until `value` (negative once past), or null if no date. */
@@ -69,6 +70,12 @@ export const describeTarget = (target: Target | null | undefined) =>
   [target?.sets && target.reps ? `${target.sets} × ${target.reps}` : target?.reps ? `${target.reps} reps` : null, target?.durationMin ? `${target.durationMin} min` : null]
     .filter(Boolean)
     .join(' · ');
+
+/** Form fields to an exercise target. Blank or 0 means "not part of this exercise". */
+export const toTarget = ({ sets, reps, durationMin }: Record<keyof Target, string>): Target | null => {
+  const target = { sets: Number(sets) || null, reps: Number(reps) || null, durationMin: Number(durationMin) || null };
+  return target.sets || target.reps || target.durationMin ? target : null;
+};
 
 /** "Dr Meera Nair" -> "Meera": the first name, skipping a title. */
 export const firstName = (name: string) => name.replace(/^(dr|mr|mrs|ms|prof)\.?\s+/i, '').split(/\s+/)[0] ?? name;
