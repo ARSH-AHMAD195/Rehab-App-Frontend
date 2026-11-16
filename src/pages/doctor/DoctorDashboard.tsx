@@ -35,7 +35,7 @@ export const DoctorDashboard = () => {
   const queryClient = useQueryClient();
   const [severity, setSeverity] = useState<(typeof SEVERITIES)[number]>('ALL');
 
-  const patients = useQuery({ queryKey: qk.patients({ limit: RECENT_PATIENTS }), queryFn: () => patientService.list({ limit: RECENT_PATIENTS }) });
+  const patients = useQuery({ queryKey: qk.patients({ scope: 'mine', limit: RECENT_PATIENTS }), queryFn: () => patientService.list({ scope: 'mine', limit: RECENT_PATIENTS }) });
   // Each range ends on the patient's today; completeDaysOf() takes today away:
   // 8 days -> the last 7 complete days, 2 days -> yesterday
   const week = useQuery({ queryKey: ['caseload', 8], queryFn: () => completionService.getCaseload(8), staleTime: CASELOAD_STALE_MS });
@@ -213,7 +213,7 @@ export const DoctorDashboard = () => {
       <Card>
         <SectionTitle
           title="Recently enrolled patients"
-          description="Only patients linked to you are shown"
+          description="Patients linked to you, whose alerts you get"
           actions={
             <Link to="/doctor/patients" className="text-sm font-semibold text-teal-800 hover:underline">
               View all patients →
@@ -224,8 +224,9 @@ export const DoctorDashboard = () => {
           <EmptyState>
             No patients linked to you yet.{' '}
             <Link to="/doctor/onboard-patient" className="font-semibold text-teal-800 underline">
-              Onboard your first patient
-            </Link>
+              Onboard a patient
+            </Link>{' '}
+            or add existing ones from their chart.
           </EmptyState>
         ) : (
           <ul className="grid gap-4 md:grid-cols-2">

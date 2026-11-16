@@ -29,6 +29,13 @@ export const ForgotPasswordPage = () => {
 
   return (
     <AuthShell title="Reset your password">
+      <Alert tone="info" className="mb-4">
+        Patients: sign in with your mobile number and choose{' '}
+        <Link to="/login" className="font-semibold underline">
+          “Sign in with a code from your doctor”
+        </Link>
+        . This page is for doctors and admins.
+      </Alert>
       {form.formError && (
         <Alert tone="error" className="mb-4">
           {form.formError}

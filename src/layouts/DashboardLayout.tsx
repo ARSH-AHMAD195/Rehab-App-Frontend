@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Activity, Dumbbell, Heart, Languages, LogOut, Stethoscope, UserCircle, UserPlus, Users, type LucideIcon } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Activity, Dumbbell, Heart, KeyRound, LogOut, Stethoscope, UserCircle, UserPlus, Users, Utensils, type LucideIcon } from 'lucide-react';
 import { useSignedInUser, useAuth } from '../context/AuthContext';
 import { MedicalDisclaimer } from '../components/common/MedicalDisclaimer';
 import { ErrorBoundary } from '../components/ErrorBoundary';
@@ -8,7 +9,10 @@ import { IdleLogout } from '../components/IdleLogout';
 import { InstallButton } from '../components/pwa/PwaPrompts';
 import { cn } from '../lib/cn';
 import { firstName, initials } from '../lib/format';
-import { setLang, t, useLang, usePatientLanguage } from '../lib/i18n';
+import { t, useLang, usePatientLanguage } from '../lib/i18n';
+import { LanguageSwitch } from '../components/common/LanguageSwitch';
+import { qk } from '../lib/queryClient';
+import { loginCodeService } from '../services/apiServices';
 import type { Role } from '../types/api';
 
 type NavItem = { label: string; short?: string; to: string; icon: LucideIcon };
@@ -18,13 +22,15 @@ const NAV: Record<Role, NavItem[]> = {
     { label: 'Today', to: '/patient/dashboard', icon: Activity },
     { label: 'My Exercises', short: 'Exercises', to: '/patient/exercises', icon: Dumbbell },
     { label: 'Health Tracker', short: 'Vitals', to: '/patient/health-tracker', icon: Heart },
+    { label: 'Diet Chart', short: 'Diet', to: '/patient/diet', icon: Utensils },
     { label: 'My Profile', short: 'Me', to: '/patient/profile', icon: UserCircle },
   ],
   doctor: [
     { label: 'Clinical Dashboard', short: 'Dashboard', to: '/doctor/dashboard', icon: Activity },
-    { label: 'Assigned Patients', short: 'Patients', to: '/doctor/patients', icon: Users },
+    { label: 'Patients', short: 'Patients', to: '/doctor/patients', icon: Users },
     { label: 'Onboard Patient', short: 'Onboard', to: '/doctor/onboard-patient', icon: UserPlus },
     { label: 'Exercise Catalog', short: 'Exercises', to: '/doctor/exercises', icon: Dumbbell },
+    { label: 'Login codes', short: 'Codes', to: '/doctor/login-requests', icon: KeyRound },
   ],
   admin: [
     { label: 'System Overview', short: 'Overview', to: '/admin/dashboard', icon: Activity },
@@ -34,6 +40,16 @@ const NAV: Record<Role, NavItem[]> = {
   ],
 };
 
+/** Small count on a nav item (e.g. patients waiting for a sign-in code). */
+type Counts = Record<string, number>;
+const CountBadge = ({ n, className }: { n: number | undefined; className?: string }) =>
+  n ? (
+    <span className={cn('min-w-5 rounded-full bg-rose-600 px-1.5 text-center text-xs font-bold leading-5 text-white', className)}>
+      {n}
+      <span className="sr-only"> waiting</span>
+    </span>
+  ) : null;
+
 const ROLE_BADGE: Record<Role, string> = {
   patient: 'bg-emerald-50 text-emerald-800 border-emerald-200',
   doctor: 'bg-teal-50 text-teal-900 border-teal-200',
@@ -41,7 +57,7 @@ const ROLE_BADGE: Record<Role, string> = {
 };
 
 /** Phones and tablets: app-style bottom tabs instead of a hidden menu (lg+ uses the sidebar). */
-const BottomTabs = ({ items }: { items: NavItem[] }) => (
+const BottomTabs = ({ items, counts }: { items: NavItem[]; counts: Counts }) => (
   <nav
     aria-label="Main"
     className="fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-lg rounded-2xl border border-slate-200 bg-white/95 shadow-lg backdrop-blur-md lg:hidden print:hidden"
@@ -60,8 +76,9 @@ const BottomTabs = ({ items }: { items: NavItem[] }) => (
           >
             {({ isActive }) => (
               <>
-                <span className={cn('flex h-8 w-12 items-center justify-center rounded-full transition-colors', isActive && 'bg-teal-100')}>
+                <span className={cn('relative flex h-8 w-12 items-center justify-center rounded-full transition-colors', isActive && 'bg-teal-100')}>
                   <Icon className="h-5 w-5" aria-hidden="true" />
+                  <CountBadge n={counts[to]} className="absolute -right-1 -top-1" />
                 </span>
                 {t(short ?? label)}
               </>
@@ -73,7 +90,7 @@ const BottomTabs = ({ items }: { items: NavItem[] }) => (
   </nav>
 );
 
-const NavItems = ({ items }: { items: NavItem[] }) =>
+const NavItems = ({ items, counts }: { items: NavItem[]; counts: Counts }) =>
   items.map(({ label, to, icon: Icon }) => (
     <NavLink
       key={to}
@@ -86,25 +103,11 @@ const NavItems = ({ items }: { items: NavItem[] }) =>
       }
     >
       <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
-      <span>{t(label)}</span>
+      <span className="flex-1">{t(label)}</span>
+      <CountBadge n={counts[to]} />
     </NavLink>
   ));
 
-/** Patients only. Each language is named in itself, so it can be found without reading the other. */
-const LanguageSwitch = () => {
-  const hindi = useLang() === 'hi';
-  return (
-    <button
-      type="button"
-      onClick={() => setLang(hindi ? 'en' : 'hi')}
-      lang={hindi ? 'en' : 'hi'}
-      className="flex min-h-10 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900"
-    >
-      <Languages className="h-4 w-4" aria-hidden="true" />
-      {hindi ? 'English' : 'हिन्दी'}
-    </button>
-  );
-};
 
 export const DashboardLayout = () => {
   const user = useSignedInUser();
@@ -127,6 +130,9 @@ export const DashboardLayout = () => {
 
   const role = user.role;
   const navItems = NAV[role];
+  // Same key as the login codes page, so they share one cache and one poll
+  const loginRequests = useQuery({ queryKey: qk.loginRequests, queryFn: loginCodeService.listRequests, enabled: role === 'doctor', refetchInterval: 30_000 });
+  const counts: Counts = { '/doctor/login-requests': loginRequests.data?.length ?? 0 };
 
   const handleLogout = async () => {
     await logout();
@@ -180,7 +186,7 @@ export const DashboardLayout = () => {
         </div>
 
         <nav aria-label="Main" className="flex-1 space-y-1 overflow-y-auto px-3">
-          <NavItems items={navItems} />
+          <NavItems items={navItems} counts={counts} />
         </nav>
 
         <div className="space-y-2 border-t border-slate-100 p-4">
@@ -220,7 +226,7 @@ export const DashboardLayout = () => {
         </main>
       </div>
 
-      <BottomTabs items={navItems} />
+      <BottomTabs items={navItems} counts={counts} />
       <IdleLogout />
     </div>
   );

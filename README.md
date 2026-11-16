@@ -17,7 +17,7 @@ The app talks straight to the three live APIs (see `.env.example`) and signs in 
 | API | Base URL | Owns |
 | --- | --- | --- |
 | Auth | `VITE_AUTH_API_URL` | Users, doctors, patients, profiles, medical profiles, invitations |
-| Health Monitoring | `VITE_HEALTH_API_URL` | Vital types, daily vitals, trends, alerts, thresholds |
+| Health Monitoring | `VITE_HEALTH_API_URL` | Vital types, daily vitals, trends, alerts, thresholds, investigations, triage, caseload |
 | Exercise | `VITE_EXERCISE_API_URL` | Categories, library, plans, daily checklist, completions, compliance |
 
 Source and docs: `ARSH-AHMAD195/Rehab-App-Backend`. `src/services/api.ts` (`apiBaseFor`) decides which API serves each path. `src/services/apiServices.ts` has one function per endpoint.
@@ -59,19 +59,17 @@ src/
 
 - **No secrets in the bundle.** `.env` holds only the Firebase web config and API URLs. Never put passwords, the Atlas address or server keys in the repo.
 - **Sign-out clears all cached data** (`queryClient.clear()`), so nothing from one user is visible to the next person on a shared device.
-- **Idle sign-out** after `VITE_IDLE_TIMEOUT_MINUTES` (default 15), with a 60-second warning. Activity is shared across tabs.
+- **Idle sign-out** after `VITE_IDLE_TIMEOUT_MINUTES` (default 15), with a 60-second warning. Activity is shared across tabs, and a session left idle with the tab closed ends when the app is next opened.
 - **The service worker caches the app shell only.** API responses are never cached.
 - **Error reports** (when `VITE_SENTRY_DSN` is set) exclude request bodies, form input, console output and record ids.
 
 ## Deploying
 
-1. **History fallback:** every unknown path must return `index.html`.
-2. **Never cache `sw.js` or `index.html`** (`Cache-Control: no-cache`). Hashed files under `assets/` can be cached immutably.
-3. **CORS:** the backend must add the deployed origin to its allowed list, or every API call is blocked.
-4. **Recommended headers:**
-   - `Content-Security-Policy: default-src 'self'; frame-src https://www.youtube-nocookie.com https://rehab-app-development.firebaseapp.com; connect-src 'self' https://*.onrender.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com <sentry ingest, if used>; img-src 'self' data:; style-src 'self' 'unsafe-inline'`
-   - `X-Content-Type-Options: nosniff`
-   - `Referrer-Policy: strict-origin-when-cross-origin`
+`vercel.json` sets the history fallback, caching and security headers. Hosting anywhere else needs the same. If you turn on Sentry, add its ingest address to `connect-src`.
+
+**CORS:** the backend only accepts browser calls from origins on its list (the production site and localhost), so a Vercel preview loads but can't sign in. To test a preview, add its exact URL to `CORS_ORIGINS` on Render, along with the origins already allowed, because setting it replaces the defaults. Don't use a wildcard: anyone can register a Vercel project with a matching name.
+
+**Deploy order:** backend first. The new medical fields are refused by an older API, while the investigations and triage screens show nothing or an error message until the API has them.
 
 ## Not in the backend yet
 

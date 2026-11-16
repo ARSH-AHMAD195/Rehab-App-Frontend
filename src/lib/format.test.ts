@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { daysUntil, firstName, formatReading, fromDateKey, initials, labelize, localDateKey, splitList, toTarget } from './format';
+import { ageInYears, dateKeyIn, daysUntil, firstName, formatReading, fromDateKey, initials, labelize, localDateKey, splitList, toTarget } from './format';
 
 describe('format helpers', () => {
+  it('dateKeyIn gives the day in the given zone, falling back to the device day', () => {
+    const now = new Date(Date.UTC(2026, 0, 31, 20, 0)); // 1 Feb 01:30 in Kolkata, 31 Jan in New York
+    expect(dateKeyIn('Asia/Kolkata', now)).toBe('2026-02-01');
+    expect(dateKeyIn('America/New_York', now)).toBe('2026-01-31');
+    expect(dateKeyIn(null, now)).toBe(localDateKey(now));
+    expect(dateKeyIn('Not/AZone', now)).toBe(localDateKey(now));
+  });
+
   it('toTarget treats blank and 0 as not set, and drops an empty target', () => {
     expect(toTarget({ sets: '0', reps: '', durationMin: '15' })).toEqual({ sets: null, reps: null, durationMin: 15 });
     expect(toTarget({ sets: '2', reps: '10', durationMin: '' })).toEqual({ sets: 2, reps: 10, durationMin: null });
@@ -22,6 +30,13 @@ describe('format helpers', () => {
     expect(daysUntil('2026-05-12', now)).toBe(2);
     expect(daysUntil(null, now)).toBeNull();
     expect(daysUntil('not a date', now)).toBeNull();
+  });
+
+  it('ageInYears only counts a year once the birthday has passed', () => {
+    const now = new Date(2026, 4, 10);
+    expect(ageInYears('1956-05-10', now)).toBe(70);
+    expect(ageInYears('1956-05-11', now)).toBe(69);
+    expect(ageInYears(null, now)).toBeNull();
   });
 
   it('local date keys round-trip without drifting to the UTC day', () => {

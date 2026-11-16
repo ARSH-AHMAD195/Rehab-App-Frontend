@@ -4,6 +4,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { firebaseAuth } from '../lib/firebase';
 import { authService, isAccountRejection } from '../services/authService';
 import { onUnauthorized } from '../services/api';
+import { idleExpired, writeLastActivity } from '../lib/idle';
 import { setMonitoringUser } from '../lib/monitoring';
 import type { User } from '../types/api';
 
@@ -15,6 +16,12 @@ interface AuthValue {
   /** Why the last session ended without the user signing out, for the login page message. */
   endReason: EndReason;
   login: (credentials: { email: string; password: string }) => Promise<User>;
+  /** Patients: mobile number + password. */
+  loginWithPhone: (credentials: { phone: string; password: string }) => Promise<User>;
+  /** Patients: mobile number + a code from their doctor. Leaves `user.mustSetPassword` true. */
+  loginWithCode: (credentials: { phone: string; code: string }) => Promise<User>;
+  /** After a code sign-in: set the patient's own password. */
+  setPassword: (password: string) => Promise<User>;
   logout: (reason?: EndReason) => Promise<void>;
   /** Asks again whether the email is verified, after the user clicked the link. */
   recheckVerification: () => Promise<User>;
@@ -49,7 +56,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(
     () =>
       onAuthStateChanged(firebaseAuth, async (firebaseUser) => {
-        if (firebaseUser) {
+        if (firebaseUser && idleExpired()) {
+          // Left signed in with the tab closed: end it here, before any health data loads
+          await authService.logout().catch(() => {});
+          signedOut('idle');
+        } else if (firebaseUser) {
           try {
             signedIn(await authService.getMe());
           } catch (err) {
@@ -61,7 +72,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         setLoading(false);
       }),
-    [signedIn]
+    [signedIn, signedOut]
   );
 
   // A 401 from any API means the session ended (expired, revoked or account deactivated).
@@ -76,14 +87,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => onUnauthorized(() => {});
   }, [signedOut]);
 
-  const login = useCallback(
-    async (credentials: { email: string; password: string }) => {
-      const next = await authService.login(credentials);
+  /** Every sign-in: record activity first, so it isn't judged by the last session's idle time. */
+  const signIn = useCallback(
+    async (attempt: () => Promise<User>) => {
+      writeLastActivity();
+      const next = await attempt();
       signedIn(next);
       return next;
     },
     [signedIn]
   );
+  const login = useCallback((c: { email: string; password: string }) => signIn(() => authService.login(c)), [signIn]);
+  const loginWithPhone = useCallback((c: { phone: string; password: string }) => signIn(() => authService.loginWithPhone(c)), [signIn]);
+  const loginWithCode = useCallback((c: { phone: string; code: string }) => signIn(() => authService.loginWithCode(c)), [signIn]);
+  const setPassword = useCallback(async (password: string) => {
+    const next = await authService.setPassword(password);
+    signedIn(next);
+    return next;
+  }, [signedIn]);
 
   const logout = useCallback(
     async (reason: EndReason = null) => {
@@ -99,7 +120,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return next;
   }, [signedIn]);
 
-  const value = useMemo(() => ({ user, loading, endReason, login, logout, recheckVerification }), [user, loading, endReason, login, logout, recheckVerification]);
+  const value = useMemo(
+    () => ({ user, loading, endReason, login, loginWithPhone, loginWithCode, setPassword, logout, recheckVerification }),
+    [user, loading, endReason, login, loginWithPhone, loginWithCode, setPassword, logout, recheckVerification]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
