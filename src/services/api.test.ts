@@ -33,6 +33,8 @@ describe('api client', () => {
       ['/auth/me', 'https://auth.test/api/v1'],
       ['/users/me/profile', 'https://auth.test/api/v1'],
       ['/patients', 'https://auth.test/api/v1'],
+      ['/doctor/caseload', 'https://health.test/api/v1'],
+      ['/doctor/patients/abc/investigations', 'https://health.test/api/v1'],
       ['/patients/abc', 'https://auth.test/api/v1'],
       ['/patients/me/medical-profile', 'https://auth.test/api/v1'],
       ['/patients/abc/medical-profile', 'https://auth.test/api/v1'],

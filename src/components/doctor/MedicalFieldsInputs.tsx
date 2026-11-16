@@ -2,8 +2,16 @@ import type { ChangeEvent } from 'react';
 import { PHONE_HINT, PHONE_PATTERN } from '../../lib/constants';
 import { labelize, localDateKey } from '../../lib/format';
 import { Field, Input, Select, Textarea } from '../ui';
-import { BLOOD_GROUPS, SEXES, SMOKING_STATUSES } from '../../types/api';
-import type { MedicalForm } from '../../lib/medical';
+import { BLOOD_GROUPS, IHD_STATUSES, SEXES, SMOKING_STATUSES } from '../../types/api';
+import { bmi, COMORBIDITIES, flipTriState, foldListedConditions, hasCondition, setCondition, type MedicalForm } from '../../lib/medical';
+
+const YES_NO = (
+  <>
+    <option value="">Not recorded</option>
+    <option value="true">Yes</option>
+    <option value="false">No</option>
+  </>
+);
 
 /** The medical profile fields. Input names match the API's error `field` paths. */
 export const MedicalFieldsInputs = ({
@@ -22,6 +30,7 @@ export const MedicalFieldsInputs = ({
   const set = (field: keyof MedicalForm) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => onChange({ ...f, [field]: e.target.value });
   const today = localDateKey();
   const contactRequired = Boolean(f.ecName || f.ecRelation || f.ecPhone);
+  const bodyMassIndex = bmi(Number(f.heightCm) || null, Number(f.onboardingWeightKg) || null);
 
   return (
     <div className="space-y-5">
@@ -57,6 +66,9 @@ export const MedicalFieldsInputs = ({
         <Field label="Height (cm)" error={errors.heightCm}>
           <Input name="heightCm" type="number" inputMode="decimal" min="50" max="250" step="any" value={f.heightCm} onChange={set('heightCm')} />
         </Field>
+        <Field label="Weight at onboarding (kg)" hint={bodyMassIndex ? `BMI ${bodyMassIndex}` : 'Later weight loss is measured against this'} error={errors.onboardingWeightKg}>
+          <Input name="onboardingWeightKg" type="number" inputMode="decimal" min="20" max="250" step="any" value={f.onboardingWeightKg} onChange={set('onboardingWeightKg')} />
+        </Field>
         <Field label="Blood group" error={errors.bloodGroup}>
           <Select name="bloodGroup" value={f.bloodGroup} onChange={set('bloodGroup')}>
             <option value="">Not recorded</option>
@@ -77,11 +89,95 @@ export const MedicalFieldsInputs = ({
             ))}
           </Select>
         </Field>
+        {f.smokingStatus === 'FORMER' && (
+          <Field label="Date they quit smoking" error={errors.smokingQuitDate}>
+            <Input name="smokingQuitDate" type="date" max={today} value={f.smokingQuitDate} onChange={set('smokingQuitDate')} />
+          </Field>
+        )}
+        <Field label="Can climb 2 flights of stairs?" hint="“No” means under 4 METs" error={errors.functionalCapacityUnder4Mets}>
+          <Select
+            name="functionalCapacityUnder4Mets"
+            value={flipTriState(f.functionalCapacityUnder4Mets)}
+            onChange={(e) => onChange({ ...f, functionalCapacityUnder4Mets: flipTriState(e.target.value) })}
+          >
+            {YES_NO}
+          </Select>
+        </Field>
+        <Field label="Chemotherapy received" error={errors.chemotherapy}>
+          <Select name="chemotherapy" value={f.chemotherapy} onChange={set('chemotherapy')}>
+            {YES_NO}
+          </Select>
+        </Field>
+        <Field label="Radiotherapy received" error={errors.radiotherapy}>
+          <Select name="radiotherapy" value={f.radiotherapy} onChange={set('radiotherapy')}>
+            {YES_NO}
+          </Select>
+        </Field>
+        {f.chemotherapy === 'true' && (
+          <>
+            <Field label="Date of last chemo" error={errors.lastChemoDate}>
+              <Input name="lastChemoDate" type="date" max={today} value={f.lastChemoDate} onChange={set('lastChemoDate')} />
+            </Field>
+            <Field label="Chemo schedule" error={errors.chemoSchedule}>
+              <Input name="chemoSchedule" maxLength={200} value={f.chemoSchedule} onChange={set('chemoSchedule')} />
+            </Field>
+          </>
+        )}
+        <Field label="Anaemia" error={errors.anaemia}>
+          <Select name="anaemia" value={f.anaemia} onChange={set('anaemia')}>
+            {YES_NO}
+          </Select>
+        </Field>
         <Field label="Allergies" hint="Separate with commas" error={errors.allergies}>
           <Input name="allergies" value={f.allergies} onChange={set('allergies')} placeholder={example('e.g. Penicillin')} />
         </Field>
-        <Field label="Other conditions" hint="Separate with commas" error={errors.comorbidities}>
-          <Input name="comorbidities" value={f.comorbidities} onChange={set('comorbidities')} placeholder={example('e.g. Hypertension, Type 2 diabetes')} />
+        <fieldset className="sm:col-span-2">
+          <legend className="mb-1.5 text-sm font-semibold text-slate-800">Conditions</legend>
+          <div className="grid gap-x-4 sm:grid-cols-2">
+            {COMORBIDITIES.map((c) => (
+              <label key={c.value} className="flex min-h-11 items-center gap-2.5 text-sm text-slate-800">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-teal-700"
+                  checked={hasCondition(f.comorbidities, c.value)}
+                  onChange={(e) => onChange({ ...f, comorbidities: setCondition(f.comorbidities, c.value, e.target.checked) })}
+                />
+                {c.label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        {hasCondition(f.comorbidities, 'Hypertension') && (
+          <Field label="Hypertension controlled on medication?" error={errors.hypertensionControlled}>
+            <Select name="hypertensionControlled" value={f.hypertensionControlled} onChange={set('hypertensionControlled')}>
+              {YES_NO}
+            </Select>
+          </Field>
+        )}
+        {hasCondition(f.comorbidities, 'Ischaemic heart disease') && (
+          <Field label="Ischaemic heart disease status" error={errors.ihdStatus}>
+            <Select name="ihdStatus" value={f.ihdStatus} onChange={set('ihdStatus')}>
+              <option value="">Not recorded</option>
+              {IHD_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {s === 'STABLE' ? 'Stable' : 'Symptomatic, or MI/stent in last 6 months'}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
+        <Field label="Other conditions" hint="Separate with commas" error={errors.otherConditions ?? errors.conditions} className="sm:col-span-2">
+          <Input
+            name="otherConditions"
+            maxLength={200}
+            value={f.otherComorbidities}
+            onChange={set('otherComorbidities')}
+            onBlur={() => {
+              const folded = foldListedConditions(f);
+              if (folded !== f) onChange(folded);
+            }}
+            placeholder={example('e.g. Asthma')}
+          />
         </Field>
         <Field label="Medications" hint="One per line" error={errors.medications} className="sm:col-span-2">
           <Textarea name="medications" rows={2} value={f.medications} onChange={set('medications')} placeholder={example('e.g. Metformin 500 mg twice daily')} />

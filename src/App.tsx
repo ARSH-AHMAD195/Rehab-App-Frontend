@@ -56,6 +56,7 @@ const routes: RouteObject[] = [
         { path: 'dashboard', ...page(() => import('./pages/patient/PatientDashboard'), 'PatientDashboard') },
         { path: 'exercises', ...page(() => import('./pages/patient/PatientExercisesPage'), 'PatientExercisesPage') },
         { path: 'health-tracker', ...page(() => import('./pages/patient/PatientHealthTrackerPage'), 'PatientHealthTrackerPage') },
+        { path: 'diet', ...page(() => import('./pages/patient/PatientDietPage'), 'PatientDietPage') },
         { path: 'profile', ...page(() => import('./pages/patient/PatientProfilePage'), 'PatientProfilePage') },
       ]),
       roleArea('doctor', [
@@ -64,6 +65,7 @@ const routes: RouteObject[] = [
         { path: 'patient/:id', ...page(() => import('./pages/doctor/DoctorPatientDetailPage'), 'DoctorPatientDetailPage') },
         { path: 'onboard-patient', ...page(() => import('./pages/doctor/DoctorOnboardPatientPage'), 'DoctorOnboardPatientPage') },
         { path: 'exercises', ...page(() => import('./pages/doctor/DoctorExercisesPage'), 'DoctorExercisesPage') },
+        { path: 'login-requests', ...page(() => import('./pages/doctor/DoctorLoginRequestsPage'), 'DoctorLoginRequestsPage') },
       ]),
       roleArea('admin', [
         { path: 'dashboard', ...page(() => import('./pages/admin/AdminDashboard'), 'AdminDashboard') },

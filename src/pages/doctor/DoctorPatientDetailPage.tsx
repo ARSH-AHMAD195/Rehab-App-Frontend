@@ -1,15 +1,16 @@
 import { useId, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, BellOff, ClipboardList, Mail, Pencil } from 'lucide-react';
-import { alertService, completionService, patientService, planService, resendInvitation, vitalsService } from '../../services/apiServices';
+import { ArrowLeft, BellOff, ClipboardList, MessageCircle, Pencil } from 'lucide-react';
+import { alertService, completionService, patientService, planService, vitalsService } from '../../services/apiServices';
 import { ApiError, errorMessage } from '../../services/api';
 import { qk } from '../../lib/queryClient';
 import { useFormErrors } from '../../lib/forms';
 import { useVitalLabel } from '../../lib/vitals';
-import { formToMedical, medicalChanges, medicalToForm, type MedicalForm } from '../../lib/medical';
-import { formatDate, formatDateTime, formatReading, initials, labelize } from '../../lib/format';
-import { Alert, Badge, Button, Card, EmptyState, ErrorState, Modal, ModalActions, PageLoader, SectionTitle } from '../../components/ui';
+import { conditionNames, formToMedical, medicalChanges, medicalToForm, type MedicalForm } from '../../lib/medical';
+import { ageInYears, formatDate, formatDateTime, formatReading, initials, labelize } from '../../lib/format';
+import { whatsappInviteUrl } from '../../lib/whatsapp';
+import { Alert, Badge, Button, buttonClass, Card, EmptyState, ErrorState, Modal, ModalActions, PageLoader, SectionTitle } from '../../components/ui';
 import { panelId, tabId, Tabs } from '../../components/ui/Tabs';
 import { useToast } from '../../components/ui/toast';
 import { VitalTrend } from '../../components/health/VitalTrend';
@@ -17,15 +18,21 @@ import { LogsTable } from '../../components/health/LogsTable';
 import { AlertSummary } from '../../components/doctor/AlertSummary';
 import { MedicalFieldsInputs } from '../../components/doctor/MedicalFieldsInputs';
 import { PlanEditorModal } from '../../components/doctor/PlanEditorModal';
+import { LoginCodeDialog } from '../../components/doctor/LoginCodeDialog';
+import { MyPatientToggle } from '../../components/doctor/MyPatientToggle';
 import { SurgeryCountdown } from '../../components/doctor/SurgeryCountdown';
 import { PlanItemCard } from '../../components/doctor/PlanItemCard';
 import { ExerciseHeatmap } from '../../components/doctor/ExerciseHeatmap';
 import { ExerciseTimeline } from '../../components/doctor/ExerciseTimeline';
+import { InvestigationsPanel } from '../../components/doctor/InvestigationsPanel';
+import { TriageCard } from '../../components/doctor/TriageCard';
 import { completeDays } from '../../lib/compliance';
 import type { MedicalProfile } from '../../types/api';
 
-const TAB_IDS = ['overview', 'vitals', 'exercises', 'alerts'] as const;
+const TAB_IDS = ['overview', 'vitals', 'investigations', 'exercises', 'alerts'] as const;
 type TabKey = (typeof TAB_IDS)[number];
+
+const yesNo = (value: boolean | null | undefined) => (value === null || value === undefined ? null : value ? 'Yes' : 'No');
 
 const Detail = ({ label, children, className }: { label: string; children: ReactNode; className?: string }) => (
   <div className={className}>
@@ -63,12 +70,14 @@ const EditMedicalForm = ({ patientId, medical, onClose }: { patientId: string; m
     mutationFn: () => patientService.updateMedical(patientId, { version: medical.version, ...medicalChanges(medical, formToMedical(f)) }),
     onSuccess: () => {
       toast.success('Medical details saved.');
-      void queryClient.invalidateQueries({ queryKey: qk.patientPart(patientId, 'medical') });
+      void queryClient.invalidateQueries({ queryKey: qk.patient(patientId) });
+      void queryClient.invalidateQueries({ queryKey: qk.caseload });
       onClose();
     },
     onError: (err) => {
       if (err instanceof ApiError && err.code === 'CONCURRENT_UPDATE') {
-        void queryClient.invalidateQueries({ queryKey: qk.patientPart(patientId, 'medical') });
+        void queryClient.invalidateQueries({ queryKey: qk.patient(patientId) });
+        void queryClient.invalidateQueries({ queryKey: qk.caseload });
         return form.setFormError('Someone else changed these details while you were editing. Close this window to load their version.');
       }
       form.fromApiError(err, 'Could not save the medical details.');
@@ -120,12 +129,6 @@ export const DoctorPatientDetailPage = () => {
   // Last 7 complete days: today isn't over, so it can't count as missed (same key as the dashboard's)
   const compliance = useQuery({ queryKey: qk.patientPart(patientId, 'compliance', 'week'), queryFn: () => completionService.getCompliance(patientId, completeDays(7)) });
 
-  const invite = useMutation({
-    mutationFn: () => resendInvitation(patientId),
-    onSuccess: (r) => (r.invitation === 'SENT' ? toast.success('Set-password email sent.') : toast.error('The email could not be sent. Try again later.')),
-    onError: (err) => toast.error(errorMessage(err, 'Could not send the email.')),
-  });
-
   const acknowledge = useMutation({
     mutationFn: (id: string) => alertService.acknowledge(id),
     onSuccess: () => toast.success('Alert acknowledged.'),
@@ -159,6 +162,7 @@ export const DoctorPatientDetailPage = () => {
   const panels: Record<TabKey, ReactNode> = {
     overview: (
       <div className="grid gap-6 lg:grid-cols-3">
+        <TriageCard patientId={patientId} />
         <Card className="lg:col-span-2">
           <SectionTitle
             title="Medical details"
@@ -190,19 +194,25 @@ export const DoctorPatientDetailPage = () => {
               <Detail label="Diagnosis" className="col-span-2">
                 {m!.diagnosis}
               </Detail>
-              <Detail label="Date of birth / sex">
-                {[m!.dateOfBirth && formatDate(m!.dateOfBirth), m!.sex && labelize(m!.sex)].filter(Boolean).join(' · ')}
+              <Detail label="Age / date of birth / sex">
+                {[m!.dateOfBirth && `${ageInYears(m!.dateOfBirth)} years`, m!.dateOfBirth && formatDate(m!.dateOfBirth), m!.sex && labelize(m!.sex)].filter(Boolean).join(' · ')}
               </Detail>
               <Detail label="Height / blood group">{[m!.heightCm && `${m!.heightCm} cm`, m!.bloodGroup].filter(Boolean).join(' · ')}</Detail>
               <Detail label="Allergies">
                 <span className="text-rose-800">{m!.allergies?.join(', ') || 'None documented'}</span>
               </Detail>
-              <Detail label="Smoking">{m!.smokingStatus && labelize(m!.smokingStatus)}</Detail>
+              <Detail label="Smoking">{[m!.smokingStatus && labelize(m!.smokingStatus), m!.smokingQuitDate && `quit ${formatDate(m!.smokingQuitDate)}`].filter(Boolean).join(' · ')}</Detail>
+              <Detail label="Weight at onboarding / BMI">
+                {[m!.onboardingWeightKg && `${m!.onboardingWeightKg} kg`, m!.bmi && `BMI ${m!.bmi}`].filter(Boolean).join(' · ')}
+              </Detail>
+              <Detail label="Can climb 2 flights of stairs">{yesNo(typeof m!.functionalCapacityUnder4Mets === 'boolean' ? !m!.functionalCapacityUnder4Mets : null)}</Detail>
+              <Detail label="Chemotherapy">{[yesNo(m!.chemotherapy), m!.lastChemoDate && `last ${formatDate(m!.lastChemoDate)}`, m!.chemoSchedule].filter(Boolean).join(' · ')}</Detail>
+              <Detail label="Radiotherapy / anaemia">{m!.radiotherapy == null && m!.anaemia == null ? '' : [yesNo(m!.radiotherapy) || '—', yesNo(m!.anaemia) || '—'].join(' / ')}</Detail>
               <Detail label="Medications" className="col-span-2">
                 {m!.medications?.join('; ') || 'None documented'}
               </Detail>
-              <Detail label="Other conditions" className="col-span-2">
-                {m!.comorbidities?.join(', ') || 'None documented'}
+              <Detail label="Conditions" className="col-span-2">
+                {conditionNames(m!).join(', ') || 'None documented'}
               </Detail>
               {m!.emergencyContact && (
                 <Detail label="Emergency contact" className="col-span-2">
@@ -219,14 +229,17 @@ export const DoctorPatientDetailPage = () => {
           <dl className="space-y-3 text-sm">
             <Detail label="Email">{p.email}</Detail>
             <Detail label="Phone">{p.phone && <a href={`tel:${p.phone}`} className="text-teal-800 underline">{p.phone}</a>}</Detail>
-            <Detail label="Care team">{p.doctors.map((d) => d.name).join(', ')}</Detail>
+            <Detail label="Linked doctors">{p.doctors.map((d) => d.name).join(', ')}</Detail>
             <Detail label="Time zone">{p.timeZone}</Detail>
-            <Detail label="Status">{!p.active ? 'Deactivated' : p.emailVerified ? 'Active' : 'Invited, hasn’t signed in yet'}</Detail>
+            <Detail label="Status">{p.active ? 'Active' : 'Deactivated'}</Detail>
           </dl>
-          <Button size="sm" variant="secondary" className="mt-4 w-full" onClick={() => invite.mutate()} loading={invite.isPending}>
-            <Mail className="h-4 w-4 text-teal-700" aria-hidden="true" />
-            Send set-password email
-          </Button>
+          <div className="mt-4 [&>button]:w-full">
+            <LoginCodeDialog patientId={p.id} patientName={p.name} phone={p.phone} />
+          </div>
+          <a href={whatsappInviteUrl(p, `${window.location.origin}/login`)} target="_blank" rel="noreferrer" className={buttonClass('secondary', 'sm', 'mt-2 w-full')}>
+            <MessageCircle className="h-4 w-4 text-teal-700" aria-hidden="true" />
+            Share app on WhatsApp
+          </a>
         </Card>
       </div>
     ),
@@ -258,6 +271,7 @@ export const DoctorPatientDetailPage = () => {
         </Card>
       </div>
     ),
+    investigations: <InvestigationsPanel patientId={patientId} medications={m?.medications} onEditMedications={() => setModal('medical')} />,
     exercises: (
       <div className="space-y-6">
         <Card>
@@ -430,10 +444,13 @@ export const DoctorPatientDetailPage = () => {
               <p className="text-sm text-slate-700 [overflow-wrap:anywhere]">{[m?.plannedSurgery, m?.plannedSurgeryDate && formatDate(m.plannedSurgeryDate), p.email].filter(Boolean).join(' · ')}</p>
             </div>
           </div>
-          <Button size="sm" onClick={() => setModal('plan')} disabled={!plan.data}>
-            <ClipboardList className="h-4 w-4" aria-hidden="true" />
-            {plan.data?.version ? 'Change exercise plan' : 'Assign exercise plan'}
-          </Button>
+          <div className="flex flex-wrap items-start gap-3">
+            <MyPatientToggle patient={p} />
+            <Button size="sm" onClick={() => setModal('plan')} disabled={!plan.data}>
+              <ClipboardList className="h-4 w-4" aria-hidden="true" />
+              {plan.data?.version ? 'Change exercise plan' : 'Assign exercise plan'}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -445,6 +462,7 @@ export const DoctorPatientDetailPage = () => {
         tabs={[
           { id: 'overview', label: 'Overview' },
           { id: 'vitals', label: 'Vitals' },
+          { id: 'investigations', label: 'Investigations' },
           { id: 'exercises', label: 'Exercises', count: plan.data?.items.length },
           { id: 'alerts', label: 'Alerts', count: alerts.data ? openAlerts.length + missedDays.length : undefined },
         ]}

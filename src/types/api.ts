@@ -27,6 +27,10 @@ export interface User {
   email: string | null;
   emailVerified: boolean;
   active: boolean;
+  /** LOGIN_CODE: signed in with a doctor's code, so there's no email to verify. */
+  loginMethod: 'PASSWORD' | 'LOGIN_CODE';
+  /** Patients: true after a sign-in with a doctor's code, until they set a password. Not in the API yet. */
+  mustSetPassword?: boolean;
 }
 
 /** GET /users/me/profile */
@@ -52,6 +56,9 @@ export interface Patient {
   active: boolean;
   emailVerified: boolean;
   doctors: Ref[];
+  plannedSurgeryDate: IsoDate | null;
+  /** Negative once surgery has passed */
+  daysToSurgery: number | null;
   createdAt: IsoDate | null;
 }
 
@@ -67,11 +74,30 @@ export interface Doctor {
   createdAt: IsoDate | null;
 }
 
-export type InvitationStatus = 'SENT' | 'FAILED';
+/** NOT_NEEDED: no email was sent (a phone-only patient signs in with a code). */
+export type InvitationStatus = 'SENT' | 'FAILED' | 'NOT_NEEDED';
+
+/** Doctor patient lists: everyone, or only patients linked to me. */
+export type PatientScope = 'all' | 'mine';
+
+/** GET /doctor/login-code-requests: a patient asked for a sign-in code. */
+export interface LoginCodeRequest {
+  patient: Ref & { phone: string | null };
+  requestedAt: IsoDate;
+}
+
+/** POST /patients/:id/login-code: the code to pass on to the patient. */
+export interface LoginCode {
+  code: string;
+  expiresAt: IsoDate;
+}
 
 export const SEXES = ['MALE', 'FEMALE', 'OTHER', 'UNDISCLOSED'] as const;
 export const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'UNKNOWN'] as const;
 export const SMOKING_STATUSES = ['NEVER', 'FORMER', 'CURRENT'] as const;
+export const CONDITIONS = ['HTN', 'DM', 'CKD', 'IHD', 'SMOKING', 'OTHER'] as const;
+export type MedicalCondition = (typeof CONDITIONS)[number];
+export const IHD_STATUSES = ['STABLE', 'SYMPTOMATIC_OR_RECENT_EVENT'] as const;
 
 export interface EmergencyContact {
   name: string;
@@ -87,7 +113,6 @@ export interface MedicalFields {
   diagnosis: string | null;
   plannedSurgery: string | null;
   plannedSurgeryDate: string | null;
-  comorbidities: string[] | null;
   allergies: string[] | null;
   medications: string[] | null;
   smokingStatus: (typeof SMOKING_STATUSES)[number] | null;
@@ -96,11 +121,32 @@ export interface MedicalFields {
   programmeStartDate: string | null;
   /** 1-365 */
   programmeLengthDays: number | null;
+  /** The first weight, at onboarding: what later weight loss is measured against */
+  onboardingWeightKg: number | null;
+  /** Ticked condition boxes; OTHER's details are in otherConditions */
+  conditions: MedicalCondition[] | null;
+  otherConditions: string | null;
+  chemotherapy: boolean | null;
+  lastChemoDate: string | null;
+  chemoSchedule: string | null;
+  radiotherapy: boolean | null;
+  anaemia: boolean | null;
+  smokingQuitDate: string | null;
+  hypertensionControlled: boolean | null;
+  ihdStatus: (typeof IHD_STATUSES)[number] | null;
+  /** True when they can't climb 2 flights of stairs */
+  functionalCapacityUnder4Mets: boolean | null;
 }
 
 /** GET .../medical-profile. `version` is 0 until something is saved. */
 export interface MedicalProfile extends MedicalFields {
   patientId: Id;
+  /** Old free-text conditions, from before the checkboxes. Not edited here. */
+  comorbidities: string[] | null;
+  /** Worked out by the API; null while an input is missing */
+  age: number | null;
+  bmi: number | null;
+  daysToSurgery: number | null;
   version: number;
   updatedAt: IsoDate | null;
   updatedBy: { id: Id; role: string } | null;
@@ -184,6 +230,39 @@ export interface Trend {
   systolic?: (number | null)[];
   diastolic?: (number | null)[];
   thresholds: ThresholdPair | Record<string, ThresholdPair | null> | null;
+}
+
+// ---------- Investigations and triage (Health Monitoring API) ----------
+
+export type InvestigationValue = { num: number } | { text: string } | { wnl: true } | { normal: boolean; text?: string } | { efPercent: number; text?: string };
+
+export interface Investigation {
+  id: Id;
+  type: string;
+  /** The day the test was done (YYYY-MM-DD) */
+  date: string;
+  value: InvestigationValue;
+  /** Null until the hospital's normal ranges are set */
+  outOfRange: boolean | null;
+  createdAt: IsoDate;
+}
+
+export type TriageTag = 'HIGH' | 'MEDIUM' | 'LOW' | 'INCOMPLETE';
+
+export interface Triage {
+  tag: TriageTag;
+  /** What met a High or Medium cut-off, in words */
+  high: string[];
+  medium: string[];
+  /** What couldn't be judged yet */
+  missing: string[];
+  flags: { code: 'WEIGHT_LOSS' | 'MUST_RISE' | 'NO_LOGGING'; detail: string }[];
+}
+
+export interface CaseloadEntry {
+  patient: Ref;
+  plannedSurgeryDate: string | null;
+  triage: Triage;
 }
 
 // ---------- Exercise API ----------

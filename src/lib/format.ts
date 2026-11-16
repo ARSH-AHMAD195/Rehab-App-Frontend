@@ -37,12 +37,30 @@ export const daysUntil = (value: DateInput, now: Date = new Date()) => {
   return Math.round((startOfDay(d) - startOfDay(now)) / DAY_MS);
 };
 
+/** Completed years since a date of birth, or null if no date. */
+export const ageInYears = (dateOfBirth: DateInput, now: Date = new Date()) => {
+  const d = toDate(dateOfBirth);
+  if (!d) return null;
+  const hadBirthday = now.getMonth() > d.getMonth() || (now.getMonth() === d.getMonth() && now.getDate() >= d.getDate());
+  return now.getFullYear() - d.getFullYear() - (hadBirthday ? 0 : 1);
+};
+
 /** YYYY-MM-DD in the user's local timezone (toISOString would give the UTC date). */
 export const localDateKey = (value: DateInput = new Date()) => {
   const d = toDate(value);
   if (!d) return '';
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+/** Today (YYYY-MM-DD) in an IANA time zone, e.g. the patient's; this device's day if none or invalid. */
+export const dateKeyIn = (timeZone: string | null | undefined, now: Date = new Date()) => {
+  try {
+    if (timeZone) return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+  } catch {
+    // Unknown zone: fall through to the device's day
+  }
+  return localDateKey(now);
 };
 
 /** Parses a YYYY-MM-DD key as a local date (new Date('2026-01-05') would be UTC midnight). */

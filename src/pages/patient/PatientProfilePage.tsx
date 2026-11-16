@@ -8,6 +8,7 @@ import { qk } from '../../lib/queryClient';
 import { useFormErrors } from '../../lib/forms';
 import { PHONE_HINT, PHONE_PATTERN } from '../../lib/constants';
 import { formatDate, labelize } from '../../lib/format';
+import { conditionNames } from '../../lib/medical';
 import { t, useLang } from '../../lib/i18n';
 import { Alert, Button, Card, ErrorState, Field, Input, PageHeader, PageLoader, SectionTitle } from '../../components/ui';
 import { useToast } from '../../components/ui/toast';
@@ -90,7 +91,7 @@ export const PatientProfilePage = () => {
           <Detail label="Diagnosis" value={m.diagnosis} />
           <Detail label="Allergies" value={m.allergies?.join(', ')} />
           <Detail label="Medications" value={m.medications?.join('; ')} />
-          <Detail label="Other conditions" value={m.comorbidities?.join(', ')} />
+          <Detail label="Conditions"value={conditionNames(m).map((c) => t(c)).join(', ')} />
           <Detail label="Time zone" value={p.timeZone} />
         </dl>
       </Card>

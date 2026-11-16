@@ -55,7 +55,7 @@ export const AdminPatientsPage = () => {
               <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-500" aria-hidden="true" />
               <Input
                 type="search"
-                aria-label="Search patients by name or email"
+                aria-label="Search patients"
                 value={search}
                 onChange={(e) => {
                   setSearch(e.target.value);
@@ -108,7 +108,8 @@ export const AdminPatientsPage = () => {
                       <td className="p-4 text-slate-700">{p.phone || '—'}</td>
                       <td className="whitespace-nowrap p-4 text-slate-700">{formatDate(p.createdAt)}</td>
                       <td className="p-4">
-                        {!p.active ? <Badge tone="rose">Deactivated</Badge> : p.emailVerified ? <Badge tone="emerald">Active</Badge> : <Badge tone="amber">Invited</Badge>}
+                        {/* Patients sign in with their phone, so email verification says nothing about them */}
+                        {p.active ? <Badge tone="emerald">Active</Badge> : <Badge tone="rose">Deactivated</Badge>}
                       </td>
                     </tr>
                   ))

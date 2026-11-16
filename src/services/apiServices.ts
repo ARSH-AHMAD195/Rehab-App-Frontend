@@ -1,5 +1,6 @@
 import { api, type QueryParams } from './api';
 import type {
+  CaseloadEntry,
   CaseloadRow,
   Category,
   Checklist,
@@ -9,16 +10,22 @@ import type {
   Doctor,
   Exercise,
   Id,
+  Investigation,
+  InvestigationValue,
   InvitationStatus,
+  LoginCode,
+  LoginCodeRequest,
   MedicalFields,
   MedicalProfile,
   Page,
   Patient,
+  PatientScope,
   Plan,
   Profile,
   SavedAlert,
   Target,
   Trend,
+  Triage,
   TrendPeriod,
   VitalAlert,
   VitalType,
@@ -45,16 +52,27 @@ export const profileService = {
 
 export const patientService = {
   /** Doctor: linked patients only (their own id is linked automatically). Admin: doctorIds required. */
-  register: (data: { name: string; email: string; phone?: string | null; timeZone?: string; doctorIds?: Id[] }) =>
+  register: (data: { name: string; phone: string; email?: string | null; timeZone?: string; doctorIds?: Id[] }) =>
     api.post<Patient & { invitation: InvitationStatus }>('/patients', data),
-  list: (params: ListParams & { doctorId?: Id } = {}) => api.get<Page<Patient>>('/patients', params),
+  /** Doctor: `scope` all (default) or only patients linked to them. */
+  list: (params: ListParams & { doctorId?: Id; scope?: PatientScope } = {}) => api.get<Page<Patient>>('/patients', params),
   get: (id: Id) => api.get<Patient>(`/patients/${id}`),
   /** `active` is admin-only. */
   update: (id: Id, data: { name?: string; phone?: string | null; timeZone?: string; active?: boolean }) =>
     api.patch<Patient>(`/patients/${id}`, data),
   setDoctors: (id: Id, doctorIds: Id[]) => api.put<Patient>(`/patients/${id}/doctors`, { doctorIds }),
+  /** Doctor: add or remove this patient from "My patients" (who gets their alerts). */
+  linkMe: (id: Id) => api.put<Patient>(`/patients/${id}/doctors/me`),
+  unlinkMe: (id: Id) => api.delete<Patient>(`/patients/${id}/doctors/me`),
+  /** Doctor: a one-time sign-in code to pass on to the patient. */
+  createLoginCode: (id: Id) => api.post<LoginCode>(`/patients/${id}/login-code`),
   getMedical: (id: Id) => api.get<MedicalProfile>(`/patients/${id}/medical-profile`),
   updateMedical: (id: Id, data: MedicalUpdate) => api.patch<MedicalProfile>(`/patients/${id}/medical-profile`, data),
+};
+
+export const loginCodeService = {
+  /** Doctor: patients waiting for a sign-in code. */
+  listRequests: () => api.get<{ data: LoginCodeRequest[] }>('/doctor/login-code-requests').then((r) => r.data),
 };
 
 export const doctorService = {
@@ -98,6 +116,15 @@ export const vitalsService = {
 export const alertService = {
   list: (params: Paged & { status?: 'OPEN' | 'ACKNOWLEDGED'; patientId?: Id } = {}) => api.get<Page<VitalAlert>>('/doctor/alerts', params),
   acknowledge: (id: Id, note?: string) => api.patch<VitalAlert>(`/doctor/alerts/${id}`, { status: 'ACKNOWLEDGED', note: note || undefined }),
+};
+
+export const clinicalService = {
+  getInvestigations: (patientId: Id) => api.get<{ data: Investigation[] }>(`/doctor/patients/${patientId}/investigations`).then((r) => r.data),
+  addInvestigation: (patientId: Id, data: { type: string; date: string; value: InvestigationValue }) =>
+    api.post<Investigation>(`/doctor/patients/${patientId}/investigations`, data),
+  removeInvestigation: (patientId: Id, resultId: Id) => api.delete<null>(`/doctor/patients/${patientId}/investigations/${resultId}`),
+  getTriage: (patientId: Id) => api.get<Triage>(`/doctor/patients/${patientId}/triage`),
+  getCaseload: (scope: PatientScope = 'all') => api.get<{ data: CaseloadEntry[] }>('/doctor/caseload', { scope }).then((r) => r.data),
 };
 
 // ---------- Exercise API ----------
