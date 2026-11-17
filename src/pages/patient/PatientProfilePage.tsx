@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, LogOut } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -124,10 +124,7 @@ export const PatientProfilePage = () => {
             </div>
           </fieldset>
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Link to="/forgot-password" className="text-sm font-semibold text-teal-800 hover:underline">
-              {t('Change my password')}
-            </Link>
+          <div className="flex flex-wrap items-center justify-end gap-3">
             <Button type="submit" loading={save.isPending} disabled={!dirty}>
               <Check className="h-4 w-4" aria-hidden="true" />
               {t('Save changes')}

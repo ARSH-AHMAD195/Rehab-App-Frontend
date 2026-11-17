@@ -12,7 +12,7 @@ import { Alert, Button, EmptyState, Field, Input, Modal, ModalActions, PageLoade
 import { useToast } from '../ui/toast';
 import type { Plan } from '../../types/api';
 
-type Row = { exerciseId: string; daysOfWeek: number[]; timesPerDay: string; sets: string; reps: string; durationMin: string; notes: string };
+type Row = { exerciseId: string; daysOfWeek: number[]; timesPerDay: string; sets: string; reps: string; durationMin: string; volumeMl: string; notes: string };
 
 const toRows = (plan: Plan): Row[] =>
   plan.items.map((i) => ({
@@ -22,6 +22,7 @@ const toRows = (plan: Plan): Row[] =>
     sets: i.target?.sets?.toString() ?? '',
     reps: i.target?.reps?.toString() ?? '',
     durationMin: i.target?.durationMin?.toString() ?? '',
+    volumeMl: i.target?.volumeMl?.toString() ?? '',
     notes: i.notes ?? '',
   }));
 
@@ -102,7 +103,7 @@ export const PlanEditorModal = ({ patientId, plan, onClose }: { patientId: strin
                   <li key={i} className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                     <div className="flex items-end gap-2">
                       <Field label={`Exercise ${i + 1}`} error={form.errors[`items.${i}.exerciseId`]} className="flex-1">
-                        <Select name={`items.${i}.exerciseId`} required value={r.exerciseId} onChange={(e) => update(i, { exerciseId: e.target.value })}>
+                        <Select name={`items.${i}.exerciseId`} required value={r.exerciseId} onChange={(e) => update(i, { exerciseId: e.target.value, volumeMl: '' })}>
                           <option value="">Choose…</option>
                           {optionsFor(r.exerciseId).map((ex) => (
                             <option key={ex.id} value={ex.id} disabled={taken.has(ex.id)}>
@@ -151,6 +152,11 @@ export const PlanEditorModal = ({ patientId, plan, onClose }: { patientId: strin
                       <Field label="Minutes" error={form.errors[`items.${i}.target.durationMin`]}>
                         <Input name={`items.${i}.target.durationMin`} type="number" inputMode="numeric" min="1" max="240" value={r.durationMin} onChange={(e) => update(i, { durationMin: e.target.value })} />
                       </Field>
+                      {options.find((ex) => ex.id === r.exerciseId)?.recordsVolume && (
+                        <Field label="Target volume (mL)" error={form.errors[`items.${i}.target.volumeMl`]}>
+                          <Input name={`items.${i}.target.volumeMl`} type="number" inputMode="numeric" min="1" max="5000" value={r.volumeMl} onChange={(e) => update(i, { volumeMl: e.target.value })} />
+                        </Field>
+                      )}
                     </div>
                     <Field label="Note for the patient (optional)" error={form.errors[`items.${i}.notes`]}>
                       <Input name={`items.${i}.notes`} maxLength={500} value={r.notes} onChange={(e) => update(i, { notes: e.target.value })} placeholder="e.g. Stop if pain goes above 5" />
@@ -164,7 +170,7 @@ export const PlanEditorModal = ({ patientId, plan, onClose }: { patientId: strin
           <Button
             variant="subtle"
             disabled={rows.length >= 30}
-            onClick={() => setRows((rs) => [...rs, { exerciseId: '', daysOfWeek: EVERY_DAY, timesPerDay: '1', sets: '', reps: '', durationMin: '', notes: '' }])}
+            onClick={() => setRows((rs) => [...rs, { exerciseId: '', daysOfWeek: EVERY_DAY, timesPerDay: '1', sets: '', reps: '', durationMin: '', volumeMl: '', notes: '' }])}
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
             Add exercise

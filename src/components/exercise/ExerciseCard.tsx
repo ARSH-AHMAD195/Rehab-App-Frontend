@@ -8,7 +8,7 @@ import type { PlanExercise, Target } from '../../types/api';
 
 const DEFAULT_SAFETY = 'Stop and rest if you feel dizzy, breathless or have chest pain.';
 
-const Tile = ({ value, label }: { value: number; label: string }) => (
+const Tile = ({ value, label }: { value: number | string; label: string }) => (
   <div className="flex-1 rounded-xl border border-teal-700/40 bg-teal-50 px-2 py-2.5 text-center">
     <p className="text-2xl font-extrabold leading-none text-teal-950">{value}</p>
     <p className="mt-1 text-xs font-bold uppercase tracking-wide text-teal-900">{label}</p>
@@ -32,10 +32,11 @@ export const ExerciseCard = ({
   children?: ReactNode;
 }) => {
   const [showDetail, setShowDetail] = useState(false);
-  const tiles: [number, string][] = [];
+  const tiles: [number | string, string][] = [];
   if (target?.sets) tiles.push([target.sets, t('Sets')]);
   if (target?.reps) tiles.push([target.reps, t('Reps')]);
   if (target?.durationMin) tiles.push([target.durationMin, t('Mins')]);
+  if (target?.volumeMl) tiles.push([`${target.volumeMl} mL`, t('Volume')]);
 
   return (
     <article className="space-y-3 rounded-3xl border border-slate-200 bg-white p-4 shadow-xs sm:p-5">

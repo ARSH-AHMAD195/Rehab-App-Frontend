@@ -83,16 +83,20 @@ export const formatReading = (value: ReadingValue | null | undefined) => {
   return 'num' in value ? String(value.num) : value.text;
 };
 
-/** An exercise target as text: "2 × 10 · 15 min". */
+/** An exercise target as text: "2 × 10 · 15 min · 1500 mL". */
 export const describeTarget = (target: Target | null | undefined) =>
-  [target?.sets && target.reps ? `${target.sets} × ${target.reps}` : target?.reps ? `${target.reps} reps` : null, target?.durationMin ? `${target.durationMin} min` : null]
+  [
+    target?.sets && target.reps ? `${target.sets} × ${target.reps}` : target?.reps ? `${target.reps} reps` : null,
+    target?.durationMin ? `${target.durationMin} min` : null,
+    target?.volumeMl ? `${target.volumeMl} mL` : null,
+  ]
     .filter(Boolean)
     .join(' · ');
 
-/** Form fields to an exercise target. Blank or 0 means "not part of this exercise". */
-export const toTarget = ({ sets, reps, durationMin }: Record<keyof Target, string>): Target | null => {
-  const target = { sets: Number(sets) || null, reps: Number(reps) || null, durationMin: Number(durationMin) || null };
-  return target.sets || target.reps || target.durationMin ? target : null;
+/** Form fields to an exercise target. Blank or 0 means "not part of this exercise". `volumeMl` only for spirometry. */
+export const toTarget = ({ sets, reps, durationMin, volumeMl = '' }: Record<'sets' | 'reps' | 'durationMin', string> & { volumeMl?: string }): Target | null => {
+  const target = { sets: Number(sets) || null, reps: Number(reps) || null, durationMin: Number(durationMin) || null, volumeMl: Number(volumeMl) || null };
+  return target.sets || target.reps || target.durationMin || target.volumeMl ? target : null;
 };
 
 /** "Dr Meera Nair" -> "Meera": the first name, skipping a title. */

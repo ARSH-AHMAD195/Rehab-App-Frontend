@@ -11,8 +11,9 @@ describe('format helpers', () => {
   });
 
   it('toTarget treats blank and 0 as not set, and drops an empty target', () => {
-    expect(toTarget({ sets: '0', reps: '', durationMin: '15' })).toEqual({ sets: null, reps: null, durationMin: 15 });
-    expect(toTarget({ sets: '2', reps: '10', durationMin: '' })).toEqual({ sets: 2, reps: 10, durationMin: null });
+    expect(toTarget({ sets: '0', reps: '', durationMin: '15' })).toEqual({ sets: null, reps: null, durationMin: 15, volumeMl: null });
+    expect(toTarget({ sets: '2', reps: '10', durationMin: '' })).toEqual({ sets: 2, reps: 10, durationMin: null, volumeMl: null });
+    expect(toTarget({ sets: '', reps: '', durationMin: '', volumeMl: '1500' })).toEqual({ sets: null, reps: null, durationMin: null, volumeMl: 1500 });
     expect(toTarget({ sets: '0', reps: '0', durationMin: '' })).toBeNull();
   });
 

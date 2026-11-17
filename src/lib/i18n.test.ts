@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { hi } from './hi';
-import { setLang, t } from './i18n';
+import { localExercise, setLang, syncLanguage, t } from './i18n';
 
 const placeholders = (s: string) => (s.match(/\{\w+\}/g) ?? []).sort();
 
@@ -25,5 +25,28 @@ describe('i18n', () => {
     for (const [file, source] of Object.entries(files)) {
       for (const [, text] of source.matchAll(/\b(?:t|tr)\('([^']+)'/g)) expect(hi[text!], `${file}: ${text}`).toBeDefined();
     }
+  });
+});
+
+describe('Hindi from the API', () => {
+  afterEach(() => setLang('en'));
+  const ex = { name: 'Breathing', description: 'Deep breaths', instructions: ['Sit up'], hi: { name: 'साँस', description: null, instructions: [] } };
+
+  it('uses each Hindi part of an exercise when filled in, English for the rest', () => {
+    expect(localExercise(ex)).toBe(ex);
+    setLang('hi');
+    expect(localExercise(ex)).toMatchObject({ name: 'साँस', description: 'Deep breaths', instructions: ['Sit up'] });
+    expect(localExercise({ ...ex, hi: null }).name).toBe('Breathing');
+  });
+
+  it('keeps a choice made on this phone, and takes the account’s on a new phone', () => {
+    const saveToAccount = vi.fn();
+    localStorage.removeItem('ffs_language');
+    syncLanguage('hi', saveToAccount);
+    expect(t('Done')).toBe('पूरा हुआ');
+    expect(saveToAccount).not.toHaveBeenCalled();
+    setLang('en');
+    syncLanguage('hi', saveToAccount);
+    expect(saveToAccount).toHaveBeenCalledWith('en');
   });
 });

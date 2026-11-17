@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { ArrowRight, ChevronLeft, ChevronRight, Search, UserPlus } from 'lucide-react';
-import { clinicalService, patientService } from '../../services/apiServices';
-import { ApiError } from '../../services/api';
+import { patientService } from '../../services/apiServices';
 import { qk } from '../../lib/queryClient';
 import { useDebouncedValue } from '../../lib/hooks';
 import { formatDate } from '../../lib/format';
@@ -33,12 +32,6 @@ export const DoctorPatientsPage = () => {
 
   const result = useQuery({ queryKey: qk.patients(params), queryFn: () => patientService.list(params), placeholderData: keepPreviousData });
   const patients = result.data?.data ?? [];
-  // The whole caseload in one call: reading each medical profile would audit a chart view per row.
-  // Heavy, and each fetch writes an audit record: don't refetch on every tab focus.
-  const caseload = useQuery({ queryKey: [...qk.caseload, scope], queryFn: () => clinicalService.getCaseload(scope), staleTime: 5 * 60_000, refetchOnWindowFocus: false });
-  // A 404 means the API doesn't offer the caseload yet: show '—' as for no entry
-  const caseloadFailed = caseload.isError && !(caseload.error instanceof ApiError && caseload.error.status === 404);
-  const clinical = new Map(caseload.data?.map((entry) => [entry.patient.id, entry]));
 
   return (
     <div className="space-y-6">
@@ -118,9 +111,7 @@ export const DoctorPatientsPage = () => {
                     </td>
                   </tr>
                 ) : (
-                  patients.map((p) => {
-                    const c = clinical.get(p.id);
-                    return (
+                  patients.map((p) => (
                     <tr key={p.id} className="hover:bg-slate-50">
                       <td className="p-4">
                         <span className="flex items-center gap-2 font-semibold text-slate-900">
@@ -134,9 +125,9 @@ export const DoctorPatientsPage = () => {
                         <span className="text-slate-600">{p.email}</span>
                       </td>
                       <td className="p-4">
-                        {c ? <TriageBadge tag={c.triage.tag} /> : caseloadFailed ? <span className="text-rose-700">Unavailable</span> : '—'}
+                        <TriageBadge triage={p.triage} />
                       </td>
-                      <td className="whitespace-nowrap p-4 text-slate-700">{formatDate(c?.plannedSurgeryDate)}</td>
+                      <td className="whitespace-nowrap p-4 text-slate-700">{formatDate(p.plannedSurgeryDate)}</td>
                       <td className="p-4 text-slate-700">{p.phone || '—'}</td>
                       <td className="whitespace-nowrap p-4 text-slate-700">{formatDate(p.createdAt)}</td>
                       <td className="p-4">
@@ -149,8 +140,7 @@ export const DoctorPatientsPage = () => {
                         </Link>
                       </td>
                     </tr>
-                    );
-                  })
+                  ))
                 )}
               </tbody>
             </table>

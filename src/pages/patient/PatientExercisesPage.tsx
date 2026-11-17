@@ -6,7 +6,7 @@ import { qk } from '../../lib/queryClient';
 import { describeDays } from '../../lib/constants';
 import { formatDate, formatDateTime } from '../../lib/format';
 import { cn } from '../../lib/cn';
-import { t, useLang } from '../../lib/i18n';
+import { localItems, t, useLang } from '../../lib/i18n';
 import { Card, EmptyState, ErrorState, PageHeader, PageLoader } from '../../components/ui';
 import { ExerciseCard } from '../../components/exercise/ExerciseCard';
 import { TodayExerciseCard } from '../../components/exercise/TodayExerciseCard';
@@ -28,9 +28,9 @@ export const PatientExercisesPage = () => {
   useLang();
   const [view, setView] = useState<'plan' | 'history'>('plan');
 
-  const plan = useQuery({ queryKey: qk.myPlan, queryFn: planService.getMine });
+  const plan = useQuery({ queryKey: qk.myPlan, queryFn: planService.getMine, select: (d) => localItems(d) });
   // Same query as the Today tab, so ticks made on either page show on both
-  const checklist = useQuery({ queryKey: qk.myChecklist, queryFn: completionService.getMyChecklist });
+  const checklist = useQuery({ queryKey: qk.myChecklist, queryFn: completionService.getMyChecklist, select: (d) => localItems(d) });
   // Last 30 days, newest first (the API's default range)
   const history = useQuery({ queryKey: qk.myCompletions, queryFn: () => completionService.getMine({ limit: 100 }), enabled: view === 'history' });
 

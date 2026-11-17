@@ -9,10 +9,10 @@ export const whatsappInviteUrl = (patient: { name: string; phone: string | null 
   const name = firstName(patient.name);
   const text = [
     `Hello ${name}, your care team has set up the Fit for Surgery app for you: ${appUrl}`,
-    'Open the link and sign in with your mobile number. The first time, ask your doctor for your 6-digit sign-in code, then set your own password.',
+    'Open the link and sign in with your mobile number, then ask your doctor for your 6-digit sign-in code.',
     '',
     `नमस्ते ${name}, आपकी देखभाल टीम ने आपके लिए Fit for Surgery ऐप शुरू किया है: ${appUrl}`,
-    'लिंक खोलें और अपने मोबाइल नंबर से साइन इन करें। पहली बार अपने डॉक्टर से 6 अंकों का साइन-इन कोड लें, फिर अपना पासवर्ड बनाएँ।',
+    'लिंक खोलें और अपने मोबाइल नंबर से साइन इन करें, फिर अपने डॉक्टर से 6 अंकों का साइन-इन कोड लें।',
   ].join('\n');
   return `https://wa.me/${patient.phone?.replace(/\D/g, '') ?? ''}?text=${encodeURIComponent(text)}`;
 };

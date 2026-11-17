@@ -30,11 +30,11 @@ export const qk = {
   myCompletions: ['my', 'completions'] as const,
   myToday: ['my', 'vitals', 'today'] as const,
   myLogs: ['my', 'vitals', 'logs'] as const,
+  myMeals: ['my', 'meals', 'today'] as const,
+  myMealHistory: ['my', 'meals', 'history'] as const,
   myTrend: (type: string, period: string) => ['my', 'vitals', 'trend', type, period] as const,
   patients: (params: object) => ['patients', params] as const,
   alerts: (params: object) => ['alerts', params] as const,
-  // Not ['caseload']: that prefixes the audited exercise-compliance keys ['caseload', days]
-  caseload: ['triageCaseload'] as const,
   patient: (id: string) => ['patient', id] as const,
   patientPart: (id: string, ...part: string[]) => ['patient', id, ...part] as const,
   library: (params: object) => ['library', params] as const,

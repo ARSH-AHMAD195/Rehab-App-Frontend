@@ -26,10 +26,12 @@ import { ExerciseHeatmap } from '../../components/doctor/ExerciseHeatmap';
 import { ExerciseTimeline } from '../../components/doctor/ExerciseTimeline';
 import { InvestigationsPanel } from '../../components/doctor/InvestigationsPanel';
 import { TriageCard } from '../../components/doctor/TriageCard';
+import { NutritionPanel } from '../../components/doctor/NutritionPanel';
+import { CareAlertsCard } from '../../components/doctor/CareAlertsCard';
 import { completeDays } from '../../lib/compliance';
 import type { MedicalProfile } from '../../types/api';
 
-const TAB_IDS = ['overview', 'vitals', 'investigations', 'exercises', 'alerts'] as const;
+const TAB_IDS = ['overview', 'vitals', 'investigations', 'nutrition', 'exercises', 'alerts'] as const;
 type TabKey = (typeof TAB_IDS)[number];
 
 const yesNo = (value: boolean | null | undefined) => (value === null || value === undefined ? null : value ? 'Yes' : 'No');
@@ -71,13 +73,13 @@ const EditMedicalForm = ({ patientId, medical, onClose }: { patientId: string; m
     onSuccess: () => {
       toast.success('Medical details saved.');
       void queryClient.invalidateQueries({ queryKey: qk.patient(patientId) });
-      void queryClient.invalidateQueries({ queryKey: qk.caseload });
+      void queryClient.invalidateQueries({ queryKey: ['patients'] });
       onClose();
     },
     onError: (err) => {
       if (err instanceof ApiError && err.code === 'CONCURRENT_UPDATE') {
         void queryClient.invalidateQueries({ queryKey: qk.patient(patientId) });
-        void queryClient.invalidateQueries({ queryKey: qk.caseload });
+        void queryClient.invalidateQueries({ queryKey: ['patients'] });
         return form.setFormError('Someone else changed these details while you were editing. Close this window to load their version.');
       }
       form.fromApiError(err, 'Could not save the medical details.');
@@ -205,7 +207,7 @@ export const DoctorPatientDetailPage = () => {
               <Detail label="Weight at onboarding / BMI">
                 {[m!.onboardingWeightKg && `${m!.onboardingWeightKg} kg`, m!.bmi && `BMI ${m!.bmi}`].filter(Boolean).join(' · ')}
               </Detail>
-              <Detail label="Can climb 2 flights of stairs">{yesNo(typeof m!.functionalCapacityUnder4Mets === 'boolean' ? !m!.functionalCapacityUnder4Mets : null)}</Detail>
+              <Detail label="Can climb 2 flights of stairs">{yesNo(m!.canClimbTwoFlights)}</Detail>
               <Detail label="Chemotherapy">{[yesNo(m!.chemotherapy), m!.lastChemoDate && `last ${formatDate(m!.lastChemoDate)}`, m!.chemoSchedule].filter(Boolean).join(' · ')}</Detail>
               <Detail label="Radiotherapy / anaemia">{m!.radiotherapy == null && m!.anaemia == null ? '' : [yesNo(m!.radiotherapy) || '—', yesNo(m!.anaemia) || '—'].join(' / ')}</Detail>
               <Detail label="Medications" className="col-span-2">
@@ -272,6 +274,7 @@ export const DoctorPatientDetailPage = () => {
       </div>
     ),
     investigations: <InvestigationsPanel patientId={patientId} medications={m?.medications} onEditMedications={() => setModal('medical')} />,
+    nutrition: <NutritionPanel patientId={patientId} />,
     exercises: (
       <div className="space-y-6">
         <Card>
@@ -366,6 +369,7 @@ export const DoctorPatientDetailPage = () => {
     ),
     alerts: (
       <div className="space-y-6">
+      <CareAlertsCard patientId={patientId} />
       <Card>
         <SectionTitle title="Missed exercises" as="h3" description="Days in the last week with planned exercises not done" />
         {compliance.isPending ? (
@@ -463,6 +467,7 @@ export const DoctorPatientDetailPage = () => {
           { id: 'overview', label: 'Overview' },
           { id: 'vitals', label: 'Vitals' },
           { id: 'investigations', label: 'Investigations' },
+          { id: 'nutrition', label: 'Nutrition' },
           { id: 'exercises', label: 'Exercises', count: plan.data?.items.length },
           { id: 'alerts', label: 'Alerts', count: alerts.data ? openAlerts.length + missedDays.length : undefined },
         ]}

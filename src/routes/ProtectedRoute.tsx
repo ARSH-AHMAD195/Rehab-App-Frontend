@@ -3,7 +3,6 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { PageLoader } from '../components/ui';
 import { VerifyEmailScreen } from '../components/common/VerifyEmailScreen';
-import { SetPasswordScreen } from '../components/common/SetPasswordScreen';
 import { HOME_BY_ROLE } from '../lib/constants';
 import type { Role } from '../types/api';
 
@@ -17,8 +16,6 @@ export const ProtectedRoute = ({ children, allowedRoles }: { children: ReactNode
     return <Navigate to="/login" replace state={{ from: location.pathname, reason: endReason }} />;
   }
   if (!allowedRoles.includes(user.role)) return <Navigate to={HOME_BY_ROLE[user.role] ?? '/'} replace />;
-  // Signed in with a doctor's code: no email to verify, but a password is needed for next time
-  if (user.mustSetPassword) return <SetPasswordScreen />;
   // Every API refuses an unverified email (but not after a code sign-in), so ask them to verify instead of showing pages that would all fail
   if (!user.emailVerified && user.loginMethod !== 'LOGIN_CODE') return <VerifyEmailScreen />;
 

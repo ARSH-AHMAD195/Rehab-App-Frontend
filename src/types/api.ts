@@ -29,8 +29,6 @@ export interface User {
   active: boolean;
   /** LOGIN_CODE: signed in with a doctor's code, so there's no email to verify. */
   loginMethod: 'PASSWORD' | 'LOGIN_CODE';
-  /** Patients: true after a sign-in with a doctor's code, until they set a password. Not in the API yet. */
-  mustSetPassword?: boolean;
 }
 
 /** GET /users/me/profile */
@@ -40,6 +38,8 @@ export interface Profile {
   name: string;
   email: string | null;
   phone: string | null;
+  /** The app language, kept on the account so it follows the patient to another phone */
+  preferredLanguage: 'en' | 'hi';
   timeZone?: string | null;
   doctors?: Ref[];
   specialization?: string | null;
@@ -59,6 +59,8 @@ export interface Patient {
   plannedSurgeryDate: IsoDate | null;
   /** Negative once surgery has passed */
   daysToSurgery: number | null;
+  /** Worked out on every read; GET /patients/:id/triage gives the reasons */
+  triage: TriageSummary;
   createdAt: IsoDate | null;
 }
 
@@ -80,16 +82,22 @@ export type InvitationStatus = 'SENT' | 'FAILED' | 'NOT_NEEDED';
 /** Doctor patient lists: everyone, or only patients linked to me. */
 export type PatientScope = 'all' | 'mine';
 
-/** GET /doctor/login-code-requests: a patient asked for a sign-in code. */
+/** GET /doctor/login-code-requests: a patient asked for a sign-in code. Any doctor can answer; mine come first. */
 export interface LoginCodeRequest {
   patient: Ref & { phone: string | null };
   requestedAt: IsoDate;
+  /** Linked to the signed-in doctor */
+  myPatient: boolean;
 }
 
 /** POST /patients/:id/login-code: the code to pass on to the patient. */
 export interface LoginCode {
+  patientId: Id;
+  phone: string | null;
   code: string;
   expiresAt: IsoDate;
+  expiresInMinutes: number;
+  maxAttempts: number;
 }
 
 export const SEXES = ['MALE', 'FEMALE', 'OTHER', 'UNDISCLOSED'] as const;
@@ -97,7 +105,7 @@ export const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', '
 export const SMOKING_STATUSES = ['NEVER', 'FORMER', 'CURRENT'] as const;
 export const CONDITIONS = ['HTN', 'DM', 'CKD', 'IHD', 'SMOKING', 'OTHER'] as const;
 export type MedicalCondition = (typeof CONDITIONS)[number];
-export const IHD_STATUSES = ['STABLE', 'SYMPTOMATIC_OR_RECENT_EVENT'] as const;
+export const IHD_STATUSES = ['STABLE', 'SYMPTOMATIC'] as const;
 
 export interface EmergencyContact {
   name: string;
@@ -132,10 +140,12 @@ export interface MedicalFields {
   radiotherapy: boolean | null;
   anaemia: boolean | null;
   smokingQuitDate: string | null;
-  hypertensionControlled: boolean | null;
+  hypertensionOnMedication: boolean | null;
   ihdStatus: (typeof IHD_STATUSES)[number] | null;
-  /** True when they can't climb 2 flights of stairs */
-  functionalCapacityUnder4Mets: boolean | null;
+  /** The last heart attack (MI) or stent */
+  lastMiOrStentDate: string | null;
+  /** True = can climb 2 flights of stairs (4+ METs) */
+  canClimbTwoFlights: boolean | null;
 }
 
 /** GET .../medical-profile. `version` is 0 until something is saved. */
@@ -159,6 +169,8 @@ export type VitalType = 'BP' | 'PULSE' | 'SPO2' | 'TEMP' | 'WEIGHT' | 'SUGAR' | 
 export interface VitalTypeDef {
   type: VitalType;
   label: string;
+  /** Hindi label; null until filled in */
+  labelHi: string | null;
   unit: string | null;
   valueKind: 'numeric' | 'pair' | 'scale' | 'text';
   minValid?: number;
@@ -232,37 +244,159 @@ export interface Trend {
   thresholds: ThresholdPair | Record<string, ThresholdPair | null> | null;
 }
 
-// ---------- Investigations and triage (Health Monitoring API) ----------
+// ---------- Investigations, triage and care-team alerts (Auth API) ----------
 
-export type InvestigationValue = { num: number } | { text: string } | { wnl: true } | { normal: boolean; text?: string } | { efPercent: number; text?: string };
+export type InvestigationGroup = 'HAEMATOLOGY' | 'BIOCHEMISTRY' | 'CARDIAC_RESPIRATORY_IMAGING' | 'NUTRITION_SCREENING';
 
-export interface Investigation {
+/** One input of a test. `range` is the approved normal range (number fields), null until the clinic sets it. */
+export type InvestigationField = { key: string; label: string; required?: boolean; range: { low: number | null; high: number | null } | null } & (
+  | { kind: 'number'; unit: string; min: number; max: number; integer?: boolean }
+  | { kind: 'text'; maxLength: number; /** Still asked for when WNL is ticked */ alsoWithWnl?: boolean }
+  | { kind: 'choice'; options: string[]; abnormal?: string[] }
+);
+
+/** GET /investigation-tests */
+export interface InvestigationTest {
+  code: string;
+  label: string;
+  group: InvestigationGroup;
+  fields: InvestigationField[];
+  /** "Within normal limits" can be entered instead of values */
+  allowWnl: boolean;
+  feedsTriage: boolean;
+  note?: string;
+}
+
+export interface InvestigationResult {
   id: Id;
-  type: string;
+  test: string;
   /** The day the test was done (YYYY-MM-DD) */
-  date: string;
-  value: InvestigationValue;
-  /** Null until the hospital's normal ranges are set */
-  outOfRange: boolean | null;
-  createdAt: IsoDate;
+  takenOn: string;
+  values: Record<string, number | string>;
+  wnl: boolean;
+  comment: string | null;
+  /** Only fields outside an approved range */
+  flags: Record<string, 'LOW' | 'HIGH' | 'ABNORMAL'>;
+  outOfRange: boolean;
+  status: 'ACTIVE' | 'RETRACTED';
+  enteredBy: { id: Id; role: string };
+  enteredAt: IsoDate | null;
+  retraction: { reason: string; by: { id: Id; role: string }; at: IsoDate | null } | null;
 }
 
-export type TriageTag = 'HIGH' | 'MEDIUM' | 'LOW' | 'INCOMPLETE';
+/** GET /patients/:id/investigations → { patientId, tests }. Results newest first. */
+export interface InvestigationGridRow {
+  test: string;
+  label: string;
+  group: InvestigationGroup;
+  results: InvestigationResult[];
+}
 
-export interface Triage {
+export type TriageTag = 'HIGH' | 'MEDIUM' | 'LOW';
+
+/** On every Patient. */
+export interface TriageSummary {
   tag: TriageTag;
-  /** What met a High or Medium cut-off, in words */
-  high: string[];
-  medium: string[];
-  /** What couldn't be judged yet */
-  missing: string[];
-  flags: { code: 'WEIGHT_LOSS' | 'MUST_RISE' | 'NO_LOGGING'; detail: string }[];
+  /** True until the clinical team confirms the rules */
+  provisional: boolean;
+  /** False when an input was missing */
+  complete: boolean;
 }
 
-export interface CaseloadEntry {
+/** GET /patients/:id/triage */
+export interface Triage extends TriageSummary {
+  patientId: Id;
+  /** High first */
+  reasons: { parameter: string; level: 'HIGH' | 'MEDIUM'; explanation: string; date: string | null }[];
+  missing: { parameter: string; needs: string }[];
+  rulesVersion: number;
+  evaluatedOn: string;
+}
+
+export type CareAlertKind = 'HIGH_VALUE' | 'WEIGHT_LOSS' | 'MUST_RISE' | 'NO_LOGGING' | 'NUTRITION_LOW';
+
+/** GET /doctor/care-alerts. `message` is written for the doctor. */
+export interface CareAlert {
+  id: Id;
   patient: Ref;
-  plannedSurgeryDate: string | null;
-  triage: Triage;
+  kind: CareAlertKind;
+  message: string;
+  details: Record<string, unknown>;
+  status: 'OPEN' | 'ACKNOWLEDGED';
+  createdAt: IsoDate | null;
+  acknowledgedBy: string | null;
+  acknowledgedAt: IsoDate | null;
+  note: string | null;
+}
+
+// ---------- Nutrition (Health Monitoring API) ----------
+
+/** `hi` is null until the clinic sends Hindi. */
+export interface BiText {
+  en: string;
+  hi: string | null;
+}
+
+export interface FoodOption {
+  code: string;
+  label: BiText;
+  quantity: string;
+  kind: 'OPTION' | 'ADDON';
+}
+
+export interface MealSlot {
+  code: string;
+  label: BiText;
+  /** Local time, e.g. "12:30-13:30" */
+  window: string;
+  kcal: number;
+  proteinG: number;
+  options: FoodOption[];
+}
+
+export interface DietTargets {
+  kcal: number;
+  proteinG: number;
+}
+
+/** `version` 0 = still the hospital chart. */
+export interface DietPlan {
+  patientId: Id;
+  dietType: string;
+  dietLabel: BiText;
+  targets: DietTargets;
+  slots: MealSlot[];
+  version: number;
+  updatedAt: IsoDate | null;
+  updatedBy: { id: Id; role: string } | null;
+}
+
+export interface MealTotals {
+  kcal: number;
+  proteinG: number;
+  slotsEaten: number;
+}
+
+/** A slot counts its full calories and protein once anything in it is ticked. */
+export interface MealDay {
+  date: string;
+  timeZone: string;
+  dietType: string;
+  dietLabel: BiText;
+  targets: DietTargets;
+  totals: MealTotals;
+  /** Whole percent of each target */
+  percent: { kcal: number | null; protein: number | null };
+  planVersion: number;
+  slots: (Omit<MealSlot, 'options'> & { eaten: boolean; options: (FoodOption & { ticked: boolean })[]; loggedAt: IsoDate | null })[];
+}
+
+export interface MealHistoryDay {
+  date: string;
+  logged: boolean;
+  totals: MealTotals | null;
+  targets: DietTargets | null;
+  percent: { kcal: number | null; protein: number | null } | null;
 }
 
 // ---------- Exercise API ----------
@@ -289,6 +423,10 @@ export interface Exercise {
   category: string;
   description: string | null;
   instructions: string[];
+  /** Hindi text; each part falls back to English when empty */
+  hi: ExerciseHindi | null;
+  /** Incentive spirometry: ask for the volume reached (mL) with each tick */
+  recordsVolume: boolean;
   video: Video | null;
   active: boolean;
   /** Who added it; null for exercises added before this was recorded */
@@ -297,12 +435,20 @@ export interface Exercise {
   updatedAt: IsoDate;
 }
 
-export type PlanExercise = Pick<Exercise, 'id' | 'name' | 'category' | 'description' | 'instructions' | 'video' | 'active'>;
+export interface ExerciseHindi {
+  name: string | null;
+  description: string | null;
+  instructions: string[];
+}
+
+export type PlanExercise = Pick<Exercise, 'id' | 'name' | 'category' | 'description' | 'instructions' | 'hi' | 'recordsVolume' | 'video' | 'active'>;
 
 export interface Target {
   sets: number | null;
   reps: number | null;
   durationMin: number | null;
+  /** Incentive spirometry, mL */
+  volumeMl: number | null;
 }
 
 export interface PlanItem {
@@ -356,7 +502,7 @@ export interface Completion {
   status: 'DONE' | 'SKIPPED';
   reason: string | null;
   completedAt: IsoDate;
-  details: { durationMin?: number | null; note?: string | null } | null;
+  details: { durationMin?: number | null; note?: string | null; volumeMl?: number | null } | null;
 }
 
 export interface Compliance {

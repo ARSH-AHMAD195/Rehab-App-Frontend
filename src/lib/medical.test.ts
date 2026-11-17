@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bmi, conditionNames, EMPTY_MEDICAL_FORM, flipTriState, foldListedConditions, formToMedical, hasCondition, medicalChanges, medicalToForm, setCondition } from './medical';
+import { bmi, conditionNames, EMPTY_MEDICAL_FORM, foldListedConditions, formToMedical, hasCondition, medicalChanges, medicalToForm, setCondition } from './medical';
 import type { MedicalProfile } from '../types/api';
 
 describe('medical form', () => {
@@ -22,9 +22,9 @@ describe('medical form', () => {
   });
 
   it('clears follow-up answers whose question is hidden', () => {
-    const answered = { lastChemoDate: '2026-01-01', chemoSchedule: 'FOLFOX', smokingQuitDate: '2020-01-01', hypertensionControlled: 'true', ihdStatus: 'STABLE' };
+    const answered = { lastChemoDate: '2026-01-01', chemoSchedule: 'FOLFOX', smokingQuitDate: '2020-01-01', hypertensionOnMedication: 'true', ihdStatus: 'STABLE', lastMiOrStentDate: '2026-06-15' };
     const hidden = formToMedical({ ...EMPTY_MEDICAL_FORM, ...answered, chemotherapy: 'false', smokingStatus: 'CURRENT' });
-    expect([hidden.lastChemoDate, hidden.chemoSchedule, hidden.smokingQuitDate, hidden.hypertensionControlled, hidden.ihdStatus]).toEqual([null, null, null, null, null]);
+    expect([hidden.lastChemoDate, hidden.chemoSchedule, hidden.smokingQuitDate, hidden.hypertensionOnMedication, hidden.ihdStatus, hidden.lastMiOrStentDate]).toEqual([null, null, null, null, null, null]);
     const shown = formToMedical({
       ...EMPTY_MEDICAL_FORM,
       ...answered,
@@ -32,12 +32,7 @@ describe('medical form', () => {
       smokingStatus: 'FORMER',
       comorbidities: 'Hypertension, Ischaemic heart disease',
     });
-    expect([shown.lastChemoDate, shown.chemoSchedule, shown.smokingQuitDate, shown.hypertensionControlled, shown.ihdStatus]).toEqual(['2026-01-01', 'FOLFOX', '2020-01-01', true, 'STABLE']);
-  });
-
-  it('flips yes and no for a question asked the other way round, and round-trips', () => {
-    expect(['', 'true', 'false'].map(flipTriState)).toEqual(['', 'false', 'true']);
-    expect(['', 'true', 'false'].map((v) => flipTriState(flipTriState(v)))).toEqual(['', 'true', 'false']);
+    expect([shown.lastChemoDate, shown.chemoSchedule, shown.smokingQuitDate, shown.hypertensionOnMedication, shown.ihdStatus, shown.lastMiOrStentDate]).toEqual(['2026-01-01', 'FOLFOX', '2020-01-01', true, 'STABLE', '2026-06-15']);
   });
 });
 
