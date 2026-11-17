@@ -1,5 +1,7 @@
 # Backend requirements: patient login and doctor visibility
 
+> **Superseded (16 Nov 2026).** The backend team built a different contract and it is the one in use: code-only patient login (no password, no phone alias email), investigations and triage under `/patients/:id/…` in the Auth API. Each API's Swagger at `/api/docs` is the reference. This file is kept for history only.
+
 Source: *Fit for Surgery: Client Change Requests* (9 Nov 2026) and the decisions on it (10 Nov 2026). Repo: `ARSH-AHMAD195/Rehab-App-Backend`.
 
 The frontend on `om/feature/change-requests` is built against the routes below. Until the backend has them, the new screens will show errors; nothing else breaks. This replaces the earlier SMS plan: there is no SMS, no Firebase Phone provider and no Blaze plan.

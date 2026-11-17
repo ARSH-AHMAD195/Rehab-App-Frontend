@@ -1,6 +1,6 @@
 import { api, type QueryParams } from './api';
 import type {
-  CaseloadEntry,
+  CareAlert,
   CaseloadRow,
   Category,
   Checklist,
@@ -9,13 +9,18 @@ import type {
   DailyLog,
   Doctor,
   Exercise,
+  DietPlan,
   Id,
-  Investigation,
-  InvestigationValue,
+  InvestigationGridRow,
+  InvestigationResult,
+  InvestigationTest,
   InvitationStatus,
   LoginCode,
   LoginCodeRequest,
   MedicalFields,
+  MealDay,
+  MealHistoryDay,
+  MealSlot,
   MedicalProfile,
   Page,
   Patient,
@@ -44,7 +49,7 @@ export type MedicalUpdate = Partial<MedicalFields> & { version: number };
 
 export const profileService = {
   getMine: () => api.get<Profile>('/users/me/profile'),
-  updateMine: (data: { name?: string; phone?: string | null; timeZone?: string; specialization?: string | null }) =>
+  updateMine: (data: { name?: string; phone?: string | null; timeZone?: string; specialization?: string | null; preferredLanguage?: 'en' | 'hi' }) =>
     api.patch<Profile>('/users/me/profile', data),
   getMyMedical: () => api.get<MedicalProfile>('/patients/me/medical-profile'),
   updateMyMedical: (data: MedicalUpdate) => api.patch<MedicalProfile>('/patients/me/medical-profile', data),
@@ -61,7 +66,7 @@ export const patientService = {
   update: (id: Id, data: { name?: string; phone?: string | null; timeZone?: string; active?: boolean }) =>
     api.patch<Patient>(`/patients/${id}`, data),
   setDoctors: (id: Id, doctorIds: Id[]) => api.put<Patient>(`/patients/${id}/doctors`, { doctorIds }),
-  /** Doctor: add or remove this patient from "My patients" (who gets their alerts). */
+  /** Doctor: add or remove this patient from "My patients" (who gets their alerts). Removing the last doctor: 409 LAST_DOCTOR. */
   linkMe: (id: Id) => api.put<Patient>(`/patients/${id}/doctors/me`),
   unlinkMe: (id: Id) => api.delete<Patient>(`/patients/${id}/doctors/me`),
   /** Doctor: a one-time sign-in code to pass on to the patient. */
@@ -118,13 +123,38 @@ export const alertService = {
   acknowledge: (id: Id, note?: string) => api.patch<VitalAlert>(`/doctor/alerts/${id}`, { status: 'ACKNOWLEDGED', note: note || undefined }),
 };
 
+export const nutritionService = {
+  getToday: () => api.get<MealDay>('/me/meals/today'),
+  /** `optionCodes: []` clears the slot. Returns the whole day; 409 DAY_CHANGED after midnight. */
+  saveSlot: (slot: string, date: string, optionCodes: string[]) => api.put<MealDay>(`/me/meals/today/${slot}`, { date, optionCodes }),
+  getHistory: (params: Range = {}) => api.get<{ data: MealHistoryDay[] }>('/me/meals', params).then((r) => r.data),
+  getPatientPlan: (patientId: Id) => api.get<DietPlan>(`/doctor/patients/${patientId}/diet-plan`),
+  /** Send only what changes; `slots` replaces the whole list. 409 CONCURRENT_UPDATE if someone saved first. */
+  updatePatientPlan: (patientId: Id, data: { version: number; dietLabel?: DietPlan['dietLabel']; targets?: DietPlan['targets']; slots?: MealSlot[] }) =>
+    api.patch<DietPlan>(`/doctor/patients/${patientId}/diet-plan`, data),
+  getPatientToday: (patientId: Id) => api.get<MealDay>(`/doctor/patients/${patientId}/meals/today`),
+  getPatientHistory: (patientId: Id, params: Range = {}) => api.get<{ data: MealHistoryDay[] }>(`/doctor/patients/${patientId}/meals`, params).then((r) => r.data),
+};
+
+// ---------- Investigations, triage and care-team alerts (Auth API) ----------
+
 export const clinicalService = {
-  getInvestigations: (patientId: Id) => api.get<{ data: Investigation[] }>(`/doctor/patients/${patientId}/investigations`).then((r) => r.data),
-  addInvestigation: (patientId: Id, data: { type: string; date: string; value: InvestigationValue }) =>
-    api.post<Investigation>(`/doctor/patients/${patientId}/investigations`, data),
-  removeInvestigation: (patientId: Id, resultId: Id) => api.delete<null>(`/doctor/patients/${patientId}/investigations/${resultId}`),
-  getTriage: (patientId: Id) => api.get<Triage>(`/doctor/patients/${patientId}/triage`),
-  getCaseload: (scope: PatientScope = 'all') => api.get<{ data: CaseloadEntry[] }>('/doctor/caseload', { scope }).then((r) => r.data),
+  getTests: () => api.get<{ data: InvestigationTest[] }>('/investigation-tests').then((r) => r.data),
+  getInvestigations: (patientId: Id) => api.get<{ patientId: Id; tests: InvestigationGridRow[] }>(`/patients/${patientId}/investigations`).then((r) => r.tests),
+  addInvestigation: (patientId: Id, data: { test: string; takenOn: string; values?: Record<string, number | string>; wnl?: boolean; comment?: string | null }) =>
+    api.post<InvestigationResult>(`/patients/${patientId}/investigations`, data),
+  /** Results are never deleted: a retracted one is kept with the reason and leaves the grid. */
+  retractInvestigation: (patientId: Id, resultId: Id, reason: string) =>
+    api.post<InvestigationResult>(`/patients/${patientId}/investigations/${resultId}/retract`, { reason }),
+  getTriage: (patientId: Id) => api.get<Triage>(`/patients/${patientId}/triage`),
+};
+
+export const careAlertService = {
+  /** Without patientId: only the doctor's own patients. With it: any patient. */
+  list: (params: Paged & { status?: 'OPEN' | 'ACKNOWLEDGED' | 'ALL'; patientId?: Id } = {}) =>
+    api.get<Page<CareAlert> & { openCount: number }>('/doctor/care-alerts', params),
+  /** 409 ALERT_ALREADY_ACKNOWLEDGED if another doctor got there first. */
+  acknowledge: (id: Id, note?: string) => api.patch<CareAlert>(`/doctor/care-alerts/${id}`, { note: note || undefined }),
 };
 
 // ---------- Exercise API ----------
@@ -134,6 +164,10 @@ export interface ExerciseInput {
   categoryId?: Id;
   description?: string | null;
   instructions?: string[];
+  /** Hindi text; null removes it */
+  hi?: { name?: string | null; description?: string | null; instructions?: string[] } | null;
+  /** Incentive spirometry: ask for the volume with each tick */
+  recordsVolume?: boolean;
   /** Any YouTube link (Unlisted or Public, embedding allowed); null removes it. */
   videoUrl?: string | null;
   active?: boolean;
@@ -173,7 +207,7 @@ export const completionService = {
   getMyChecklist: () => api.get<Checklist>('/patients/me/exercise-checklist'),
   /** A tick, or a skip for the rest of the day: `{ status: 'SKIPPED', reason }` (no details). Undo either with `undo`. */
   complete: (
-    data: { itemId: string; date: string } & ({ status?: 'DONE'; details?: { durationMin?: number; note?: string } | null } | { status: 'SKIPPED'; reason: string }),
+    data: { itemId: string; date: string } & ({ status?: 'DONE'; details?: { durationMin?: number; note?: string; volumeMl?: number } | null } | { status: 'SKIPPED'; reason: string }),
     idempotencyKey = crypto.randomUUID()
   ) =>
     api.post<Completion>('/exercise-completions', data, idempotencyKey),
@@ -182,6 +216,6 @@ export const completionService = {
   getChecklist: (patientId: Id, date?: string) => api.get<Checklist>(`/patients/${patientId}/exercise-checklist`, { date }),
   getHistory: (patientId: Id, params: Range & Paged = {}) => api.get<Page<Completion>>(`/patients/${patientId}/exercise-completions`, params),
   getCompliance: (patientId: Id, params: Range = {}) => api.get<Compliance>(`/patients/${patientId}/exercise-compliance`, params),
-  /** Every linked patient's counts over the last `days` days (1-90), each ending on that patient's today. */
-  getCaseload: (days: number) => api.get<{ days: number; data: CaseloadRow[] }>('/doctor/exercise-compliance', { days }),
+  /** Patients' counts over the last `days` days (1-90), each ending on that patient's today. */
+  getCaseload: (days: number, scope?: PatientScope) => api.get<{ days: number; data: CaseloadRow[] }>('/doctor/exercise-compliance', { days, scope }),
 };

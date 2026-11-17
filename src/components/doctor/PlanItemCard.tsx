@@ -17,10 +17,16 @@ export const PlanItemCard = ({ patientId, plan, item }: { patientId: string; pla
   const queryClient = useQueryClient();
   const form = useFormErrors();
   const [editing, setEditing] = useState(false);
-  const [t, setT] = useState({ sets: '', reps: '', durationMin: '' });
+  const [t, setT] = useState({ sets: '', reps: '', durationMin: '', volumeMl: '' });
+  const spirometry = item.exercise.recordsVolume;
 
   const startEditing = () => {
-    setT({ sets: item.target?.sets?.toString() ?? '', reps: item.target?.reps?.toString() ?? '', durationMin: item.target?.durationMin?.toString() ?? '' });
+    setT({
+      sets: item.target?.sets?.toString() ?? '',
+      reps: item.target?.reps?.toString() ?? '',
+      durationMin: item.target?.durationMin?.toString() ?? '',
+      volumeMl: item.target?.volumeMl?.toString() ?? '',
+    });
     form.setFormError('');
     setEditing(true);
   };
@@ -83,10 +89,11 @@ export const PlanItemCard = ({ patientId, plan, item }: { patientId: string; pla
       {editing && (
         <form noValidate onSubmit={handleSubmit} onChange={form.onChange} className="mt-3 space-y-3">
           {form.formError && <Alert tone="error">{form.formError}</Alert>}
-          <div className="grid grid-cols-3 gap-2">
+          <div className={spirometry ? 'grid grid-cols-2 gap-2 sm:grid-cols-4' : 'grid grid-cols-3 gap-2'}>
             {input('sets', 'Sets', 0, 20)}
             {input('reps', 'Reps', 0, 100)}
             {input('durationMin', 'Minutes', 1, 240)}
+            {spirometry && input('volumeMl', 'Volume (mL)', 1, 5000)}
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" size="sm" onClick={() => setEditing(false)}>

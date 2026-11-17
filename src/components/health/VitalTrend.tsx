@@ -61,11 +61,11 @@ export const VitalTrend = ({ queryKeyBase, load }: { queryKeyBase: readonly stri
 
   return (
     <TrendChart
-      title={def ? vitalName(def.type, def.label) : tr('Trend')}
+      title={def ? vitalName(def.type, def.label, def.labelHi) : tr('Trend')}
       subtitle={trend.data?.unit ? tr('One value per day ({unit})', { unit: trend.data.unit }) : tr('One value per day')}
       actions={pickers}
       data={chart?.rows ?? []}
-      series={(chart?.keys ?? []).map((k, i) => ({ key: k, name: k === 'values' ? (def ? vitalName(def.type, def.label) : type) : tr(k[0]!.toUpperCase() + k.slice(1)), color: COLORS[i]! }))}
+      series={(chart?.keys ?? []).map((k, i) => ({ key: k, name: k === 'values' ? (def ? vitalName(def.type, def.label, def.labelHi) : type) : tr(k[0]!.toUpperCase() + k.slice(1)), color: COLORS[i]! }))}
       limits={chart?.limits}
     />
   );

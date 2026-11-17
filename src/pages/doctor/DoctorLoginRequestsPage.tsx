@@ -4,7 +4,7 @@ import { LoginCodeDialog } from '../../components/doctor/LoginCodeDialog';
 import { loginCodeService } from '../../services/apiServices';
 import { formatDateTime } from '../../lib/format';
 import { qk } from '../../lib/queryClient';
-import { Card, EmptyState, ErrorState, PageHeader, PageLoader } from '../../components/ui';
+import { Badge, Card, EmptyState, ErrorState, PageHeader, PageLoader } from '../../components/ui';
 
 const requestedAgo = (iso: string) => {
   const min = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
@@ -34,6 +34,11 @@ export const DoctorLoginRequestsPage = () => {
                   <Link to={`/doctor/patient/${r.patient.id}`} className="font-semibold text-teal-800 underline">
                     {r.patient.name}
                   </Link>
+                  {r.myPatient && (
+                    <Badge tone="teal" className="ml-2">
+                      Mine<span className="sr-only">: linked to you</span>
+                    </Badge>
+                  )}
                   <p className="text-sm text-slate-600">
                     {r.patient.phone} · requested <time dateTime={r.requestedAt}>{requestedAgo(r.requestedAt)}</time>
                   </p>

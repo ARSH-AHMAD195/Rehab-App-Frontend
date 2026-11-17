@@ -21,13 +21,12 @@ export const MyPatientToggle = ({ patient }: { patient: Patient }) => {
       queryClient.setQueryData(qk.patient(patient.id), updated);
       void queryClient.invalidateQueries({ queryKey: qk.patient(patient.id) });
       void queryClient.invalidateQueries({ queryKey: ['patients'] });
-      void queryClient.invalidateQueries({ queryKey: qk.caseload });
       toast.success(mine ? `${patient.name} removed from your patients.` : `${patient.name} added to your patients.`);
     },
     onError: (err) =>
       toast.error(
         err instanceof ApiError && err.code === 'LAST_DOCTOR'
-          ? 'You’re this patient’s only doctor. Add another doctor before removing yourself.'
+          ? 'You’re this patient’s only doctor. Another doctor must add them first.'
           : errorMessage(err, 'Could not update your patients.'),
       ),
   });

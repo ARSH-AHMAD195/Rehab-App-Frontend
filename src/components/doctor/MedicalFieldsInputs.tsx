@@ -3,7 +3,7 @@ import { PHONE_HINT, PHONE_PATTERN } from '../../lib/constants';
 import { labelize, localDateKey } from '../../lib/format';
 import { Field, Input, Select, Textarea } from '../ui';
 import { BLOOD_GROUPS, IHD_STATUSES, SEXES, SMOKING_STATUSES } from '../../types/api';
-import { bmi, COMORBIDITIES, flipTriState, foldListedConditions, hasCondition, setCondition, type MedicalForm } from '../../lib/medical';
+import { bmi, COMORBIDITIES, foldListedConditions, hasCondition, setCondition, type MedicalForm } from '../../lib/medical';
 
 const YES_NO = (
   <>
@@ -94,12 +94,8 @@ export const MedicalFieldsInputs = ({
             <Input name="smokingQuitDate" type="date" max={today} value={f.smokingQuitDate} onChange={set('smokingQuitDate')} />
           </Field>
         )}
-        <Field label="Can climb 2 flights of stairs?" hint="“No” means under 4 METs" error={errors.functionalCapacityUnder4Mets}>
-          <Select
-            name="functionalCapacityUnder4Mets"
-            value={flipTriState(f.functionalCapacityUnder4Mets)}
-            onChange={(e) => onChange({ ...f, functionalCapacityUnder4Mets: flipTriState(e.target.value) })}
-          >
+        <Field label="Can climb 2 flights of stairs?" hint="“No” means under 4 METs" error={errors.canClimbTwoFlights}>
+          <Select name="canClimbTwoFlights" value={f.canClimbTwoFlights} onChange={set('canClimbTwoFlights')}>
             {YES_NO}
           </Select>
         </Field>
@@ -148,8 +144,8 @@ export const MedicalFieldsInputs = ({
           </div>
         </fieldset>
         {hasCondition(f.comorbidities, 'Hypertension') && (
-          <Field label="Hypertension controlled on medication?" error={errors.hypertensionControlled}>
-            <Select name="hypertensionControlled" value={f.hypertensionControlled} onChange={set('hypertensionControlled')}>
+          <Field label="On medication for hypertension?" error={errors.hypertensionOnMedication}>
+            <Select name="hypertensionOnMedication" value={f.hypertensionOnMedication} onChange={set('hypertensionOnMedication')}>
               {YES_NO}
             </Select>
           </Field>
@@ -160,10 +156,15 @@ export const MedicalFieldsInputs = ({
               <option value="">Not recorded</option>
               {IHD_STATUSES.map((s) => (
                 <option key={s} value={s}>
-                  {s === 'STABLE' ? 'Stable' : 'Symptomatic, or MI/stent in last 6 months'}
+                  {s === 'STABLE' ? 'Stable' : 'Symptomatic'}
                 </option>
               ))}
             </Select>
+          </Field>
+        )}
+        {hasCondition(f.comorbidities, 'Ischaemic heart disease') && (
+          <Field label="Date of last MI or stent" hint="Leave blank if none" error={errors.lastMiOrStentDate}>
+            <Input name="lastMiOrStentDate" type="date" max={today} value={f.lastMiOrStentDate} onChange={set('lastMiOrStentDate')} />
           </Field>
         )}
         <Field label="Other conditions" hint="Separate with commas" error={errors.otherConditions ?? errors.conditions} className="sm:col-span-2">

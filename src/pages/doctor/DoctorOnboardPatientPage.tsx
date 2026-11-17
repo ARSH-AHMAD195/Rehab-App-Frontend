@@ -9,7 +9,6 @@ import { DEFAULT_TIME_ZONE, PHONE_HINT, PHONE_PATTERN } from '../../lib/constant
 import { EMPTY_MEDICAL_FORM, formToMedical, type MedicalForm } from '../../lib/medical';
 import { dateKeyIn, localDateKey } from '../../lib/format';
 import { normalizePhone } from '../../lib/phoneLogin';
-import { qk } from '../../lib/queryClient';
 import { Alert, Button, Card, Field, Input } from '../../components/ui';
 import { useToast } from '../../components/ui/toast';
 import { MedicalFieldsInputs } from '../../components/doctor/MedicalFieldsInputs';
@@ -19,6 +18,8 @@ const EMPTY_ACCOUNT = { name: '', phone: '', email: '', timeZone: DEFAULT_TIME_Z
 /** Saved as the first dated investigation results, so each test has one history. */
 const EMPTY_RESULTS = { HB: '', ALBUMIN: '', MUST: '', PG_SGA: '' };
 const RESULT_LABELS: Record<keyof typeof EMPTY_RESULTS, string> = { HB: 'Haemoglobin', ALBUMIN: 'Albumin', MUST: 'MUST', PG_SGA: 'PG-SGA' };
+/** The test's field each number goes in (GET /investigation-tests) */
+const RESULT_FIELD: Record<keyof typeof EMPTY_RESULTS, string> = { HB: 'value', ALBUMIN: 'value', MUST: 'score', PG_SGA: 'score' };
 
 const Section = ({ title, children }: { title: string; children: ReactNode }) => (
   // The divider lives on a wrapper: a border on <fieldset> itself is drawn through its <legend>
@@ -67,9 +68,9 @@ export const DoctorOnboardPatientPage = () => {
       }
       const filled = (Object.entries(results) as [keyof typeof EMPTY_RESULTS, string][]).filter(([, value]) => value.trim());
       // The server checks result dates against the patient's own today
-      const date = dateKeyIn(patient.timeZone);
+      const takenOn = dateKeyIn(patient.timeZone);
       const saved = await Promise.allSettled(
-        filled.map(([type, value]) => clinicalService.addInvestigation(patient.id, { type, date, value: { num: Number(value) } }))
+        filled.map(([test, value]) => clinicalService.addInvestigation(patient.id, { test, takenOn, values: { [RESULT_FIELD[test]]: Number(value) } }))
       );
       const resultsFailed = filled.filter((_, i) => saved[i]?.status === 'rejected').map(([type]) => RESULT_LABELS[type]);
       return { patient, medicalError, resultsFailed };
@@ -77,7 +78,6 @@ export const DoctorOnboardPatientPage = () => {
     onSuccess: ({ patient, medicalError, resultsFailed }) => {
       void queryClient.invalidateQueries({ queryKey: ['patients'] });
       void queryClient.invalidateQueries({ queryKey: ['caseload'] });
-      void queryClient.invalidateQueries({ queryKey: qk.caseload });
       // Patients sign in with their phone and a code from their doctor, so any email sent is a courtesy
       toast.success(`${patient.name} is enrolled. Give them a sign-in code from their page.`);
       if (medicalError) toast.error(`The medical details weren’t saved: ${errorMessage(medicalError)} Add them from the chart.`);

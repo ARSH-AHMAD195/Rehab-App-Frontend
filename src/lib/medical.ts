@@ -53,17 +53,15 @@ export const EMPTY_MEDICAL_FORM = {
   radiotherapy: '',
   anaemia: '',
   smokingQuitDate: '',
-  hypertensionControlled: '',
+  hypertensionOnMedication: '',
   ihdStatus: '',
-  functionalCapacityUnder4Mets: '',
+  lastMiOrStentDate: '',
+  canClimbTwoFlights: '',
 };
 export type MedicalForm = typeof EMPTY_MEDICAL_FORM;
 
 const yesNoToForm = (value: boolean | null | undefined) => (value === null || value === undefined ? '' : String(value));
 const yesNoFromForm = (value: string) => (value === '' ? null : value === 'true');
-
-/** Yes becomes no and no becomes yes; not-recorded stays not-recorded. For a question asked the opposite way round to how it's stored. */
-export const flipTriState = (value: string) => (value === '' ? '' : value === 'true' ? 'false' : 'true');
 
 /** kg/m², to one decimal place; null until both are known. */
 export const bmi = (heightCm: number | null, weightKg: number | null) =>
@@ -94,9 +92,10 @@ export const medicalToForm = (m: MedicalProfile): MedicalForm => ({
   radiotherapy: yesNoToForm(m.radiotherapy),
   anaemia: yesNoToForm(m.anaemia),
   smokingQuitDate: m.smokingQuitDate ?? '',
-  hypertensionControlled: yesNoToForm(m.hypertensionControlled),
+  hypertensionOnMedication: yesNoToForm(m.hypertensionOnMedication),
   ihdStatus: m.ihdStatus ?? '',
-  functionalCapacityUnder4Mets: yesNoToForm(m.functionalCapacityUnder4Mets),
+  lastMiOrStentDate: m.lastMiOrStentDate ?? '',
+  canClimbTwoFlights: yesNoToForm(m.canClimbTwoFlights),
 });
 
 const orNull = (s: string) => s.trim() || null;
@@ -135,9 +134,10 @@ export const formToMedical = (f: MedicalForm): MedicalFields => ({
   radiotherapy: yesNoFromForm(f.radiotherapy),
   anaemia: yesNoFromForm(f.anaemia),
   smokingQuitDate: f.smokingStatus === 'FORMER' ? orNull(f.smokingQuitDate) : null,
-  hypertensionControlled: hasCondition(f.comorbidities, 'Hypertension') ? yesNoFromForm(f.hypertensionControlled) : null,
+  hypertensionOnMedication: hasCondition(f.comorbidities, 'Hypertension') ? yesNoFromForm(f.hypertensionOnMedication) : null,
   ihdStatus: hasCondition(f.comorbidities, 'Ischaemic heart disease') ? ((orNull(f.ihdStatus) as MedicalFields['ihdStatus']) ?? null) : null,
-  functionalCapacityUnder4Mets: yesNoFromForm(f.functionalCapacityUnder4Mets),
+  lastMiOrStentDate: hasCondition(f.comorbidities, 'Ischaemic heart disease') ? orNull(f.lastMiOrStentDate) : null,
+  canClimbTwoFlights: yesNoFromForm(f.canClimbTwoFlights),
 });
 
 /** Conditions typed into "Other conditions" that have a checkbox, ticked instead, so their follow-up questions show. */

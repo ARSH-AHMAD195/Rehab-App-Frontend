@@ -9,10 +9,10 @@ import { IdleLogout } from '../components/IdleLogout';
 import { InstallButton } from '../components/pwa/PwaPrompts';
 import { cn } from '../lib/cn';
 import { firstName, initials } from '../lib/format';
-import { t, useLang, usePatientLanguage } from '../lib/i18n';
+import { syncLanguage, t, useLang, usePatientLanguage, type Lang } from '../lib/i18n';
 import { LanguageSwitch } from '../components/common/LanguageSwitch';
 import { qk } from '../lib/queryClient';
-import { loginCodeService } from '../services/apiServices';
+import { loginCodeService, profileService } from '../services/apiServices';
 import type { Role } from '../types/api';
 
 type NavItem = { label: string; short?: string; to: string; icon: LucideIcon };
@@ -117,7 +117,18 @@ export const DashboardLayout = () => {
   const mainRef = useRef<HTMLElement>(null);
   const firstRender = useRef(true);
   useLang();
-  usePatientLanguage(user.role === 'patient');
+  const patient = user.role === 'patient';
+  usePatientLanguage(patient);
+
+  // The language is kept on the patient's account, so it follows them to another phone
+  const saveLanguage = (preferredLanguage: Lang) => void profileService.updateMine({ preferredLanguage }).catch(() => {});
+  const profile = useQuery({ queryKey: qk.myProfile, queryFn: profileService.getMine, enabled: patient });
+  const accountLanguage = profile.data?.preferredLanguage;
+  useEffect(() => {
+    if (accountLanguage) syncLanguage(accountLanguage, saveLanguage);
+    // Once per sign-in: later switches save themselves
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [Boolean(accountLanguage)]);
 
   // Move focus to the new page on navigation so screen readers announce it
   useEffect(() => {
@@ -204,7 +215,7 @@ export const DashboardLayout = () => {
 
           <div className="flex items-center gap-2">
             <InstallButton className="lg:hidden" />
-            {role === 'patient' && <LanguageSwitch />}
+            {role === 'patient' && <LanguageSwitch onSwitch={saveLanguage} />}
             {logoutButton('px-3')}
           </div>
         </header>

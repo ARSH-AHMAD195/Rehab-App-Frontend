@@ -128,7 +128,7 @@ export const LoginCodeDialog = ({ patientId, patientName, phone }: Props) => {
               </Button>
             )}
             <p className="text-sm text-slate-600">
-              A new code replaces any earlier one. After signing in with it, the patient will be asked to set a new password.
+              A new code replaces any earlier one. The patient stays signed in on their phone after using it.
             </p>
           </div>
         </Modal>

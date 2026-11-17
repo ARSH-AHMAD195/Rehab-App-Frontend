@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { authErrorMessage, authService } from '../../services/authService';
 import { cleanCode } from '../../lib/phoneLogin';
@@ -8,13 +8,13 @@ import { t } from '../../lib/i18n';
 import { Alert, Button, Field, Input } from '../ui';
 
 /**
- * Patients' first sign-in, or after a forgotten password: ask for a code, get it from the doctor, type it in.
- * Success sets the user, and the login page sends them home (the app then asks for a new password).
+ * How patients sign in: ask for a code, get it from the doctor, type it in. Success sets the user and the
+ * login page sends them home. They stay signed in on that phone; if ever signed out, they ask for a new code.
  */
-export const CodeSignIn = ({ initialPhone, onCancel }: { initialPhone: string; onCancel: () => void }) => {
+export const CodeSignIn = () => {
   const { loginWithCode } = useAuth();
   const [step, setStep] = useState<'phone' | 'code'>('phone');
-  const [phone, setPhone] = useState(initialPhone);
+  const [phone, setPhone] = useState('+91');
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -113,15 +113,6 @@ export const CodeSignIn = ({ initialPhone, onCancel }: { initialPhone: string; o
           </div>
         </form>
       )}
-
-      <button
-        type="button"
-        onClick={onCancel}
-        className="inline-flex min-h-10 items-center gap-1.5 text-sm font-semibold text-slate-700 hover:text-teal-800"
-      >
-        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        {t('Sign in with password instead')}
-      </button>
     </div>
   );
 };

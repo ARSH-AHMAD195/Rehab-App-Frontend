@@ -129,14 +129,14 @@ export const VitalsForm = ({ onSaved }: { onSaved?: () => void }) => {
           def.valueKind === 'pair' ? (
             <fieldset key={def.type} className="grid grid-cols-2 gap-3 sm:col-span-2 lg:col-span-1">
               <legend className="mb-1 text-sm font-semibold text-slate-800">
-                {vitalName(def.type, def.label)} ({def.unit})
+                {vitalName(def.type, def.label, def.labelHi)} ({def.unit})
               </legend>
               {input(def, `readings.${def.type}.systolic`, 'Top number')}
               {input(def, `readings.${def.type}.diastolic`, 'Bottom number')}
             </fieldset>
           ) : (
             <div key={def.type} className={def.valueKind === 'text' ? 'sm:col-span-2 lg:col-span-3' : undefined}>
-              {input(def, inputsFor(def)[0]!, `${vitalName(def.type, def.label)}${def.isOptional ? ` ${t('(optional)')}` : ''}`)}
+              {input(def, inputsFor(def)[0]!, `${vitalName(def.type, def.label, def.labelHi)}${def.isOptional ? ` ${t('(optional)')}` : ''}`)}
             </div>
           )
         )}

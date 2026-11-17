@@ -11,6 +11,7 @@ import { Alert, Badge, Button, Card, EmptyState, ErrorState, PageLoader, Section
 import { adherenceOf, completeDaysOf, missed, ON_TRACK } from '../../lib/compliance';
 import { useToast } from '../../components/ui/toast';
 import { AlertSummary } from '../../components/doctor/AlertSummary';
+import { CareAlertsCard } from '../../components/doctor/CareAlertsCard';
 import type { AlertSeverity, VitalAlert } from '../../types/api';
 
 const SEVERITIES = ['ALL', 'HIGH', 'MEDIUM', 'LOW'] as const;
@@ -38,8 +39,8 @@ export const DoctorDashboard = () => {
   const patients = useQuery({ queryKey: qk.patients({ scope: 'mine', limit: RECENT_PATIENTS }), queryFn: () => patientService.list({ scope: 'mine', limit: RECENT_PATIENTS }) });
   // Each range ends on the patient's today; completeDaysOf() takes today away:
   // 8 days -> the last 7 complete days, 2 days -> yesterday
-  const week = useQuery({ queryKey: ['caseload', 8], queryFn: () => completionService.getCaseload(8), staleTime: CASELOAD_STALE_MS });
-  const yesterday = useQuery({ queryKey: ['caseload', 2], queryFn: () => completionService.getCaseload(2), staleTime: CASELOAD_STALE_MS });
+  const week = useQuery({ queryKey: ['caseload', 8], queryFn: () => completionService.getCaseload(8, 'mine'), staleTime: CASELOAD_STALE_MS });
+  const yesterday = useQuery({ queryKey: ['caseload', 2], queryFn: () => completionService.getCaseload(2, 'mine'), staleTime: CASELOAD_STALE_MS });
   const alerts = useQuery({ queryKey: qk.alerts({ status: 'OPEN' }), queryFn: () => alertService.list({ status: 'OPEN', limit: 100 }), refetchInterval: 60_000 });
 
   const acknowledge = useMutation({
@@ -209,6 +210,8 @@ export const DoctorDashboard = () => {
           </ul>
         )}
       </Card>
+
+      <CareAlertsCard />
 
       <Card>
         <SectionTitle

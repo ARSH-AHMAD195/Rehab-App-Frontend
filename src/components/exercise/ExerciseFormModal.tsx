@@ -13,7 +13,25 @@ const formOf = (ex?: Exercise) => ({
   description: ex?.description ?? '',
   instructions: ex?.instructions.join('\n') ?? '',
   videoUrl: ex?.video?.url ?? '',
+  recordsVolume: ex?.recordsVolume ?? false,
+  hiName: ex?.hi?.name ?? '',
+  hiDescription: ex?.hi?.description ?? '',
+  hiInstructions: ex?.hi?.instructions.join('\n') ?? '',
 });
+type Form = ReturnType<typeof formOf>;
+
+const toInput = (f: Form): ExerciseInput => {
+  const hi = { name: f.hiName.trim() || null, description: f.hiDescription.trim() || null, instructions: splitList(f.hiInstructions, '\n') };
+  return {
+    name: f.name.trim(),
+    categoryId: f.categoryId,
+    description: f.description.trim() || null,
+    instructions: splitList(f.instructions, '\n'),
+    videoUrl: f.videoUrl.trim() || null,
+    recordsVolume: f.recordsVolume,
+    hi: hi.name || hi.description || hi.instructions.length ? hi : null,
+  };
+};
 
 /**
  * Adds an exercise, or edits one. Admins and doctors both use it; the API lets a doctor edit only
@@ -25,19 +43,15 @@ export const ExerciseFormModal = ({ exercise, categories, onClose }: { exercise?
   const form = useFormErrors();
   const initial = formOf(exercise);
   const [f, setF] = useState(initial);
-  const set = (field: keyof typeof initial) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setF((p) => ({ ...p, [field]: e.target.value }));
+  const set = (field: Exclude<keyof Form, 'recordsVolume'>) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+    setF((p) => ({ ...p, [field]: e.target.value }));
 
   const save = useMutation({
     mutationFn: () => {
-      const all: ExerciseInput = {
-        name: f.name.trim(),
-        categoryId: f.categoryId,
-        description: f.description.trim() || null,
-        instructions: splitList(f.instructions, '\n'),
-        videoUrl: f.videoUrl.trim() || null,
-      };
+      const all = toInput(f);
       if (!exercise) return exerciseService.create({ ...all, name: all.name!, categoryId: all.categoryId! });
-      const changed = Object.fromEntries(Object.entries(all).filter(([k]) => f[k as keyof typeof f] !== initial[k as keyof typeof initial]));
+      const before = toInput(initial);
+      const changed = Object.fromEntries(Object.entries(all).filter(([k, v]) => JSON.stringify(v) !== JSON.stringify(before[k as keyof ExerciseInput])));
       return exerciseService.update(exercise.id, changed);
     },
     onSuccess: (ex) => {
@@ -81,6 +95,31 @@ export const ExerciseFormModal = ({ exercise, categories, onClose }: { exercise?
         <Field label="YouTube video (optional)" hint="Unlisted or Public, with embedding allowed. It’s checked with YouTube when you save." error={form.errors.videoUrl}>
           <Input name="videoUrl" value={f.videoUrl} onChange={set('videoUrl')} placeholder="https://youtu.be/…" />
         </Field>
+        <label className="flex min-h-11 items-center gap-2.5 text-sm font-semibold text-slate-800">
+          <input
+            type="checkbox"
+            name="recordsVolume"
+            className="h-4 w-4 accent-teal-700"
+            checked={f.recordsVolume}
+            onChange={(e) => setF((p) => ({ ...p, recordsVolume: e.target.checked }))}
+          />
+          Incentive spirometry: ask the patient for the volume reached (mL)
+        </label>
+        <details className="rounded-xl border border-slate-200 p-3" open={Boolean(initial.hiName || initial.hiDescription || initial.hiInstructions)}>
+          <summary className="cursor-pointer text-sm font-semibold text-slate-800">Hindi text (optional)</summary>
+          <p className="mt-1 text-xs text-slate-600">Shown to patients using the app in Hindi. Anything left blank shows in English.</p>
+          <div className="mt-3 space-y-4" lang="hi">
+            <Field label="Name in Hindi" error={form.errors['hi.name']}>
+              <Input name="hi.name" value={f.hiName} onChange={set('hiName')} />
+            </Field>
+            <Field label="Description in Hindi" error={form.errors['hi.description']}>
+              <Textarea name="hi.description" rows={2} value={f.hiDescription} onChange={set('hiDescription')} />
+            </Field>
+            <Field label="Instructions in Hindi" hint="One step per line" error={form.errors['hi.instructions']}>
+              <Textarea name="hi.instructions" rows={4} value={f.hiInstructions} onChange={set('hiInstructions')} />
+            </Field>
+          </div>
+        </details>
         <ModalActions onCancel={onClose} submitLabel={exercise ? 'Save changes' : 'Save to library'} loading={save.isPending} />
       </form>
     </Modal>

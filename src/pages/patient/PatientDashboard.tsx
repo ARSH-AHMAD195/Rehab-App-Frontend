@@ -9,7 +9,7 @@ import { Card, EmptyState, ErrorState, PageLoader, SectionTitle, buttonClass } f
 import { TodayExerciseCard } from '../../components/exercise/TodayExerciseCard';
 import { ProgramProgressCard } from '../../components/patient/ProgramProgressCard';
 import { programmeFor } from '../../lib/programme';
-import { t, useLang } from '../../lib/i18n';
+import { localItems, t, useLang } from '../../lib/i18n';
 import type { Checklist, ChecklistItem, Reading, VitalType } from '../../types/api';
 
 const TILES: { type: VitalType; label: string }[] = [
@@ -91,7 +91,7 @@ export const PatientDashboard = () => {
 
   const profile = useQuery({ queryKey: qk.myProfile, queryFn: profileService.getMine });
   const medical = useQuery({ queryKey: qk.myMedical, queryFn: profileService.getMyMedical });
-  const checklist = useQuery({ queryKey: qk.myChecklist, queryFn: completionService.getMyChecklist });
+  const checklist = useQuery({ queryKey: qk.myChecklist, queryFn: completionService.getMyChecklist, select: (d) => localItems(d) });
   const today = useQuery({ queryKey: qk.myToday, queryFn: vitalsService.getToday });
 
   if (checklist.isPending) return <PageLoader label="Loading your day…" />;

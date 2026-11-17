@@ -8,19 +8,20 @@ import { Alert, Field, Input, Modal, ModalActions, Textarea } from '../ui';
 import { useToast } from '../ui/toast';
 import type { ChecklistItem } from '../../types/api';
 
-/** Ticks one planned exercise off for today. Minutes and a note are optional. */
+/** Ticks one planned exercise off for today. Minutes, a note and (spirometry) the volume reached are optional. */
 export const CompleteExerciseModal = ({ item, date, onClose }: { item: ChecklistItem; date: string; onClose: () => void }) => {
   const toast = useToast();
   const queryClient = useQueryClient();
   const form = useFormErrors();
   const [minutes, setMinutes] = useState(item.target?.durationMin ? String(item.target.durationMin) : '');
   const [note, setNote] = useState('');
+  const [volume, setVolume] = useState('');
   // One key per tick attempt: a retry after a timeout is never counted twice
   const [idempotencyKey] = useState(() => crypto.randomUUID());
 
   const save = useMutation({
     mutationFn: () => {
-      const details = { ...(minutes && { durationMin: Number(minutes) }), ...(note.trim() && { note: note.trim() }) };
+      const details = { ...(minutes && { durationMin: Number(minutes) }), ...(volume && { volumeMl: Number(volume) }), ...(note.trim() && { note: note.trim() }) };
       return completionService.complete({ itemId: item.itemId, date, details: Object.keys(details).length ? details : null }, idempotencyKey);
     },
     onSuccess: () => {
@@ -45,6 +46,15 @@ export const CompleteExerciseModal = ({ item, date, onClose }: { item: Checklist
     <Modal title="Mark as done" description={item.exercise.name} onClose={onClose}>
       <form noValidate onSubmit={handleSubmit} onChange={form.onChange} className="space-y-4">
         {form.formError && <Alert tone="error">{form.formError}</Alert>}
+        {item.exercise.recordsVolume && (
+          <Field
+            label="Volume reached (mL)"
+            hint={item.target?.volumeMl ? t('Your target: {ml} mL', { ml: item.target.volumeMl }) : undefined}
+            error={form.errors['details.volumeMl']}
+          >
+            <Input name="details.volumeMl" type="number" inputMode="numeric" min="0" max="5000" step="1" value={volume} onChange={(e) => setVolume(e.target.value)} />
+          </Field>
+        )}
         <Field label="Minutes (optional)" error={form.errors['details.durationMin']}>
           <Input name="details.durationMin" type="number" inputMode="numeric" min="1" max="240" value={minutes} onChange={(e) => setMinutes(e.target.value)} />
         </Field>

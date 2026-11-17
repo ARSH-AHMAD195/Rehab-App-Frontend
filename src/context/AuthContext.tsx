@@ -16,12 +16,8 @@ interface AuthValue {
   /** Why the last session ended without the user signing out, for the login page message. */
   endReason: EndReason;
   login: (credentials: { email: string; password: string }) => Promise<User>;
-  /** Patients: mobile number + password. */
-  loginWithPhone: (credentials: { phone: string; password: string }) => Promise<User>;
-  /** Patients: mobile number + a code from their doctor. Leaves `user.mustSetPassword` true. */
+  /** Patients: mobile number + a code from their doctor. */
   loginWithCode: (credentials: { phone: string; code: string }) => Promise<User>;
-  /** After a code sign-in: set the patient's own password. */
-  setPassword: (password: string) => Promise<User>;
   logout: (reason?: EndReason) => Promise<void>;
   /** Asks again whether the email is verified, after the user clicked the link. */
   recheckVerification: () => Promise<User>;
@@ -98,13 +94,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     [signedIn]
   );
   const login = useCallback((c: { email: string; password: string }) => signIn(() => authService.login(c)), [signIn]);
-  const loginWithPhone = useCallback((c: { phone: string; password: string }) => signIn(() => authService.loginWithPhone(c)), [signIn]);
   const loginWithCode = useCallback((c: { phone: string; code: string }) => signIn(() => authService.loginWithCode(c)), [signIn]);
-  const setPassword = useCallback(async (password: string) => {
-    const next = await authService.setPassword(password);
-    signedIn(next);
-    return next;
-  }, [signedIn]);
 
   const logout = useCallback(
     async (reason: EndReason = null) => {
@@ -121,8 +111,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [signedIn]);
 
   const value = useMemo(
-    () => ({ user, loading, endReason, login, loginWithPhone, loginWithCode, setPassword, logout, recheckVerification }),
-    [user, loading, endReason, login, loginWithPhone, loginWithCode, setPassword, logout, recheckVerification]
+    () => ({ user, loading, endReason, login, loginWithCode, logout, recheckVerification }),
+    [user, loading, endReason, login, loginWithCode, logout, recheckVerification]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,7 +1,7 @@
-import { sendEmailVerification, sendPasswordResetEmail, signInWithCustomToken, signInWithEmailAndPassword, signOut, updatePassword } from 'firebase/auth';
+import { sendEmailVerification, sendPasswordResetEmail, signInWithCustomToken, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { firebaseAuth } from '../lib/firebase';
 import { api, ApiError, errorMessage } from './api';
-import { normalizePhone, phoneLoginEmail } from '../lib/phoneLogin';
+import { normalizePhone } from '../lib/phoneLogin';
 import type { User } from '../types/api';
 
 // Sign-in, sign-out and password reset happen in Firebase; the Auth API only says who we are.
@@ -26,26 +26,13 @@ export const authService = {
     await signInWithEmailAndPassword(firebaseAuth, email, password);
     return meOrSignOut();
   },
-  /** Patients: mobile number and their own password (Firebase knows them by the phone's login alias). */
-  loginWithPhone: async ({ phone, password }: { phone: string; password: string }) => {
-    await signInWithEmailAndPassword(firebaseAuth, phoneLoginEmail(phone), password);
-    return meOrSignOut();
-  },
   /** Patients: ask their doctor for a sign-in code. Always "accepted", whether or not the number is known. */
   requestLoginCode: (phone: string) => api.post<unknown>('/auth/login-code/request', { phone: normalizePhone(phone) }),
-  /** Patients: sign in with the code their doctor gave them. They must then set a password. */
+  /** Patients: sign in with the code their doctor gave them. They stay signed in on this phone. */
   loginWithCode: async ({ phone, code }: { phone: string; code: string }) => {
     const { customToken } = await api.post<{ customToken: string }>('/auth/login-code/verify', { phone: normalizePhone(phone), code });
     await signInWithCustomToken(firebaseAuth, customToken);
     return meOrSignOut();
-  },
-  /** After a code sign-in: set the patient's own password, then tell the API it's done. */
-  setPassword: async (password: string) => {
-    const current = firebaseAuth.currentUser;
-    if (!current) throw new Error('Not signed in');
-    await updatePassword(current, password);
-    await api.post<null>('/auth/me/password-set');
-    return getMe();
   },
   logout: () => signOut(firebaseAuth),
   getMe,
@@ -66,8 +53,6 @@ export const authService = {
 
 const FIREBASE_ERRORS: Record<string, string> = {
   'auth/invalid-credential': 'Incorrect sign-in details. Check them and try again.',
-  'auth/weak-password': 'Choose a longer password (at least 8 characters).',
-  'auth/requires-recent-login': 'For your security, sign in again with a new code from your doctor, then set your password.',
   'auth/invalid-email': 'Enter a valid email address.',
   'auth/user-disabled': 'This account has been deactivated. Please contact your care team.',
   'auth/too-many-requests': 'Too many attempts. Please wait a few minutes and try again.',
