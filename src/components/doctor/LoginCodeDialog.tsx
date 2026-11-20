@@ -11,7 +11,6 @@ import type { LoginCode } from '../../types/api';
 
 type Props = { patientId: string; patientName: string; phone: string | null | undefined };
 
-/** "+919876543210" -> "+91••••••3210": enough to confirm who it's for. */
 /** +919876543210 → +91••••••3210: country code and last four digits stay visible. */
 const maskPhone = (phone: string) => phone.replace(/^(\+\d{2})?(\d*)(\d{4})$/, (_, cc = '', mid: string, last: string) => cc + '•'.repeat(mid.length) + last);
 const groupCode = (code: string) => `${code.slice(0, 3)} ${code.slice(3)}`;
@@ -36,7 +35,8 @@ const copyText = async (text: string) => {
 
 /** Bilingual, like whatsapp.ts. No health details. */
 const whatsappCodeUrl = (name: string, phone: string | null | undefined, code: string, minutes: number) => {
-  const hours = minutes >= 90 ? Math.round(minutes / 60) : 0;
+  // Rounded down: never promise the patient more time than the code has
+  const hours = minutes >= 90 ? Math.floor(minutes / 60) : 0;
   const text = [
     `Hello ${firstName(name)}, your Fit for Surgery sign-in code is ${groupCode(code)}. It expires in ${hours ? `${hours} hours` : `${minutes} minutes`}, or once you sign in with it. Do not share it with anyone.`,
     '',

@@ -10,18 +10,24 @@ import { Alert, Button, Field, Input, Modal, ModalActions, Select } from '../ui'
 import { useToast } from '../ui/toast';
 import type { DietPlan, FoodOption, MealSlot } from '../../types/api';
 
-/** Form rows: numbers as typed, and an empty code for anything added here (made on save). */
-type OptionRow = { code: string; en: string; hi: string; quantity: string; kind: FoodOption['kind'] };
-type SlotRow = { code: string; en: string; hi: string; from: string; to: string; kcal: string; protein: string; options: OptionRow[] };
+/** Form rows: numbers as typed, and an empty code for anything added here (made on save). `key` is for React only. */
+type OptionRow = { key: number; code: string; en: string; hi: string; quantity: string; kind: FoodOption['kind'] };
+type SlotRow = { key: number; code: string; en: string; hi: string; from: string; to: string; kcal: string; protein: string; options: OptionRow[] };
 
 const MAX_SLOTS = 12;
 const MAX_OPTIONS = 20;
-const EMPTY_OPTION: OptionRow = { code: '', en: '', hi: '', quantity: '', kind: 'OPTION' };
+/** The Health API refuses request bodies over 16 KB; Hindi text takes 3 bytes a letter. */
+const MAX_BODY_BYTES = 16 * 1024;
+
+let lastKey = 0;
+const nextKey = () => ++lastKey;
+const emptyOption = (): OptionRow => ({ key: nextKey(), code: '', en: '', hi: '', quantity: '', kind: 'OPTION' });
 
 const toRows = (slots: MealSlot[]): SlotRow[] =>
   slots.map((s) => {
     const [from = '', to = ''] = s.window.split('-');
     return {
+      key: nextKey(),
       code: s.code,
       en: s.label.en,
       hi: s.label.hi ?? '',
@@ -29,7 +35,7 @@ const toRows = (slots: MealSlot[]): SlotRow[] =>
       to,
       kcal: String(s.kcal),
       protein: String(s.proteinG),
-      options: s.options.map((o) => ({ code: o.code, en: o.label.en, hi: o.label.hi ?? '', quantity: o.quantity, kind: o.kind })),
+      options: s.options.map((o) => ({ key: nextKey(), code: o.code, en: o.label.en, hi: o.label.hi ?? '', quantity: o.quantity, kind: o.kind })),
     };
   });
 
@@ -73,14 +79,18 @@ export const DietPlanModal = ({ patientId, plan, onClose }: { patientId: string;
   const updateOption = (i: number, k: number, patch: Partial<OptionRow>) =>
     setSlots((ss) => ss.map((s, j) => (j === i ? { ...s, options: s.options.map((o, l) => (l === k ? { ...o, ...patch } : o)) } : s)));
 
+  // The version these edits started from. After a clash the plan refetches underneath, and saving
+  // with its new version would silently overwrite the other doctor's chart.
+  const [version] = useState(plan.version);
+  const body = () => ({
+    version,
+    dietLabel: text(nameEn, nameHi),
+    targets: { kcal: Number(kcal), proteinG: Number(protein) },
+    slots: toSlots(slots),
+  });
+
   const save = useMutation({
-    mutationFn: () =>
-      nutritionService.updatePatientPlan(patientId, {
-        version: plan.version,
-        dietLabel: text(nameEn, nameHi),
-        targets: { kcal: Number(kcal), proteinG: Number(protein) },
-        slots: toSlots(slots),
-      }),
+    mutationFn: () => nutritionService.updatePatientPlan(patientId, body()),
     onSuccess: () => {
       toast.success('Diet plan saved.');
       void queryClient.invalidateQueries({ queryKey: qk.patientPart(patientId, 'nutrition') });
@@ -100,7 +110,23 @@ export const DietPlanModal = ({ patientId, plan, onClose }: { patientId: string;
     if (slots.length === 0) return form.setFormError('Add at least one meal.');
     const noMain = slots.findIndex((s) => !s.options.some((o) => o.kind === 'OPTION'));
     if (noMain >= 0) return form.setFormError(`${slots[noMain]!.en || `Meal ${noMain + 1}`} needs at least one main option, not only add-ons.`);
-    if (form.validate(e.currentTarget)) save.mutate();
+    if (!form.validate(e.currentTarget)) return;
+    // A window may run up to midnight ("22:00-00:00")
+    const backwards = slots.findIndex((s) => s.to <= s.from && s.to !== '00:00');
+    if (backwards >= 0) {
+      form.setFieldError(`slots.${backwards}.windowTo`, 'Must be later than the start time.');
+      return form.setFormError('Please correct the highlighted fields.');
+    }
+    if (new Blob([JSON.stringify(body())]).size > MAX_BODY_BYTES) {
+      return form.setFormError('This diet plan is too long to save. Remove some meals or food options, or shorten their names.');
+    }
+    save.mutate();
+  };
+
+  // Server errors name rows by position, so they'd point at the wrong row once one is removed
+  const removeRow = (update: (ss: SlotRow[]) => SlotRow[]) => {
+    form.clearAll();
+    setSlots(update);
   };
 
   return (
@@ -115,17 +141,17 @@ export const DietPlanModal = ({ patientId, plan, onClose }: { patientId: string;
             <Input name="dietLabel.hi" lang="hi" maxLength={300} value={nameHi} onChange={(e) => setNameHi(e.target.value)} />
           </Field>
           <Field label="Daily calories (kcal)" error={err('targets.kcal')}>
-            <Input name="targets.kcal" type="number" inputMode="numeric" min="500" max="6000" step="1" required value={kcal} onChange={(e) => setKcal(e.target.value)} />
+            <Input name="targets.kcal" type="number" inputMode="numeric" min="1" max="6000" step="1" required value={kcal} onChange={(e) => setKcal(e.target.value)} />
           </Field>
           <Field label="Daily protein (g)" error={err('targets.proteinG')}>
-            <Input name="targets.proteinG" type="number" inputMode="decimal" min="10" max="300" step="any" required value={protein} onChange={(e) => setProtein(e.target.value)} />
+            <Input name="targets.proteinG" type="number" inputMode="decimal" min="1" max="300" step="any" required value={protein} onChange={(e) => setProtein(e.target.value)} />
           </Field>
         </div>
 
         <h3 className="pt-2 text-base font-bold text-slate-900">Meals</h3>
         <ol className="space-y-3">
           {slots.map((s, i) => (
-            <li key={i} className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <li key={s.key} className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="flex items-end gap-2">
                 <div className="grid flex-1 gap-3 sm:grid-cols-2">
                   <Field label={`Meal ${i + 1}`} error={err(`slots.${i}.label.en`)}>
@@ -135,7 +161,7 @@ export const DietPlanModal = ({ patientId, plan, onClose }: { patientId: string;
                     <Input name={`slots.${i}.label.hi`} lang="hi" maxLength={300} value={s.hi} onChange={(e) => updateSlot(i, { hi: e.target.value })} />
                   </Field>
                 </div>
-                <Button variant="ghost" size="sm" aria-label={`Remove meal ${s.en || i + 1}`} onClick={() => setSlots((ss) => ss.filter((_, j) => j !== i))}>
+                <Button variant="ghost" size="sm" aria-label={`Remove meal ${s.en || i + 1}`} onClick={() => removeRow((ss) => ss.filter((_, j) => j !== i))}>
                   <Trash2 className="h-4 w-4 text-rose-700" aria-hidden="true" />
                 </Button>
               </div>
@@ -160,7 +186,7 @@ export const DietPlanModal = ({ patientId, plan, onClose }: { patientId: string;
                 {s.options.map((o, k) => {
                   const at = `slots.${i}.options.${k}`;
                   return (
-                    <div key={k} className="flex items-end gap-2 rounded-xl border border-slate-200 bg-white p-3">
+                    <div key={o.key} className="flex items-end gap-2 rounded-xl border border-slate-200 bg-white p-3">
                       <div className="grid flex-1 gap-2 sm:grid-cols-4">
                         <Field label="Food" error={err(`${at}.label.en`)}>
                           <Input name={`${at}.label.en`} required maxLength={300} value={o.en} onChange={(e) => updateOption(i, k, { en: e.target.value })} />
@@ -178,13 +204,13 @@ export const DietPlanModal = ({ patientId, plan, onClose }: { patientId: string;
                           </Select>
                         </Field>
                       </div>
-                      <Button variant="ghost" size="sm" aria-label={`Remove ${o.en || `food ${k + 1}`}`} onClick={() => updateSlot(i, { options: s.options.filter((_, l) => l !== k) })}>
+                      <Button variant="ghost" size="sm" aria-label={`Remove ${o.en || `food ${k + 1}`}`} onClick={() => removeRow((ss) => ss.map((x, j) => (j === i ? { ...x, options: x.options.filter((_, l) => l !== k) } : x)))}>
                         <Trash2 className="h-4 w-4 text-rose-700" aria-hidden="true" />
                       </Button>
                     </div>
                   );
                 })}
-                <Button variant="subtle" size="sm" disabled={s.options.length >= MAX_OPTIONS} onClick={() => updateSlot(i, { options: [...s.options, EMPTY_OPTION] })}>
+                <Button variant="subtle" size="sm" disabled={s.options.length >= MAX_OPTIONS} onClick={() => updateSlot(i, { options: [...s.options, emptyOption()] })}>
                   <Plus className="h-4 w-4" aria-hidden="true" />
                   Add food
                 </Button>
@@ -196,7 +222,7 @@ export const DietPlanModal = ({ patientId, plan, onClose }: { patientId: string;
         <Button
           variant="subtle"
           disabled={slots.length >= MAX_SLOTS}
-          onClick={() => setSlots((ss) => [...ss, { code: '', en: '', hi: '', from: '', to: '', kcal: '', protein: '', options: [EMPTY_OPTION] }])}
+          onClick={() => setSlots((ss) => [...ss, { key: nextKey(), code: '', en: '', hi: '', from: '', to: '', kcal: '', protein: '', options: [emptyOption()] }])}
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
           Add meal
