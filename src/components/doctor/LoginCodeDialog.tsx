@@ -15,6 +15,9 @@ type Props = { patientId: string; patientName: string; phone: string | null | un
 /** +919876543210 → +91••••••3210: country code and last four digits stay visible. */
 const maskPhone = (phone: string) => phone.replace(/^(\+\d{2})?(\d*)(\d{4})$/, (_, cc = '', mid: string, last: string) => cc + '•'.repeat(mid.length) + last);
 const groupCode = (code: string) => `${code.slice(0, 3)} ${code.slice(3)}`;
+const pad = (n: number) => String(n).padStart(2, '0');
+/** Seconds left → "23:59:59", or "9:59" under an hour. */
+const clock = (s: number) => (s >= 3600 ? `${Math.floor(s / 3600)}:${pad(Math.floor(s / 60) % 60)}` : `${Math.floor(s / 60)}`) + `:${pad(s % 60)}`;
 
 const copyText = async (text: string) => {
   try {
@@ -33,10 +36,11 @@ const copyText = async (text: string) => {
 
 /** Bilingual, like whatsapp.ts. No health details. */
 const whatsappCodeUrl = (name: string, phone: string | null | undefined, code: string, minutes: number) => {
+  const hours = minutes >= 90 ? Math.round(minutes / 60) : 0;
   const text = [
-    `Hello ${firstName(name)}, your Fit for Surgery sign-in code is ${groupCode(code)}. It expires in ${minutes} minutes. Do not share it with anyone.`,
+    `Hello ${firstName(name)}, your Fit for Surgery sign-in code is ${groupCode(code)}. It expires in ${hours ? `${hours} hours` : `${minutes} minutes`}, or once you sign in with it. Do not share it with anyone.`,
     '',
-    `नमस्ते ${firstName(name)}, आपका Fit for Surgery साइन-इन कोड ${groupCode(code)} है। यह ${minutes} मिनट में समाप्त हो जाएगा। इसे किसी के साथ साझा न करें।`,
+    `नमस्ते ${firstName(name)}, आपका Fit for Surgery साइन-इन कोड ${groupCode(code)} है। यह ${hours ? `${hours} घंटे` : `${minutes} मिनट`} में, या इससे साइन इन करते ही, समाप्त हो जाएगा। इसे किसी के साथ साझा न करें।`,
   ].join('\n');
   return `https://wa.me/${phone?.replace(/\D/g, '') ?? ''}?text=${encodeURIComponent(text)}`;
 };
@@ -79,7 +83,7 @@ const CodeView = ({ code, patientName, phone, onNew, creating }: { code: LoginCo
           {groupCode(code.code)}
         </p>
         <p className="mt-2 text-sm font-semibold text-teal-900" role="timer" aria-live="off">
-          Expires in {Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}
+          Expires in {clock(left)}
         </p>
       </div>
       <div className="flex gap-3">

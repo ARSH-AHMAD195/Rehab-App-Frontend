@@ -116,7 +116,7 @@ export const DoctorOnboardPatientPage = () => {
               <Input name="name" required maxLength={100} autoComplete="off" value={account.name} onChange={set('name')} />
             </Field>
             <Field label="Mobile number" hint={`They sign in with this. ${PHONE_HINT}`} error={form.errors.phone}>
-              <Input name="phone" type="tel" required pattern={PHONE_PATTERN} autoComplete="off" value={account.phone} onChange={set('phone')} />
+              <Input name="phone" type="tel" required pattern={PHONE_PATTERN} autoComplete="off" value={account.phone} onChange={(e) => setAccount((p) => ({ ...p, phone: normalizePhone(e.target.value) }))} />
             </Field>
             <Field label="Email address (optional)" error={form.errors.email}>
               <Input name="email" type="email" autoComplete="off" value={account.email} onChange={set('email')} />

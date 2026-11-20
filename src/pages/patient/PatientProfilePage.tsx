@@ -7,6 +7,7 @@ import { profileService } from '../../services/apiServices';
 import { qk } from '../../lib/queryClient';
 import { useFormErrors } from '../../lib/forms';
 import { PHONE_HINT, PHONE_PATTERN } from '../../lib/constants';
+import { normalizePhone } from '../../lib/phoneLogin';
 import { formatDate, labelize } from '../../lib/format';
 import { conditionNames } from '../../lib/medical';
 import { t, useLang } from '../../lib/i18n';
@@ -24,7 +25,7 @@ const Detail = ({ label, value }: { label: string; value: string | null | undefi
 
 const EMPTY_CONTACT: EmergencyContact = { name: '', relation: '', phone: '' };
 type ProfileForm = { name: string; phone: string; contact: EmergencyContact };
-const formOf = (p: Profile, m: MedicalProfile): ProfileForm => ({ name: p.name, phone: p.phone ?? '', contact: m.emergencyContact ?? EMPTY_CONTACT });
+const formOf = (p: Profile, m: MedicalProfile): ProfileForm => ({ name: p.name, phone: normalizePhone(p.phone ?? ''), contact: m.emergencyContact ? { ...m.emergencyContact, phone: normalizePhone(m.emergencyContact.phone) } : EMPTY_CONTACT });
 
 export const PatientProfilePage = () => {
   useLang();
@@ -47,7 +48,7 @@ export const PatientProfilePage = () => {
     mutationFn: async () => {
       const before = server!;
       if (f.name !== before.name || f.phone !== before.phone) {
-        await profileService.updateMine({ name: f.name.trim(), phone: f.phone.trim() || null });
+        await profileService.updateMine({ name: f.name.trim(), phone: f.phone });
       }
       if (JSON.stringify(f.contact) !== JSON.stringify(before.contact)) {
         const c = { name: f.contact.name.trim(), relation: f.contact.relation.trim(), phone: f.contact.phone.trim() };
@@ -105,7 +106,7 @@ export const PatientProfilePage = () => {
               <Input name="name" required maxLength={100} autoComplete="name" value={f.name} onChange={(e) => setF((s) => ({ ...s, name: e.target.value }))} />
             </Field>
             <Field label="Your phone number" hint={PHONE_HINT} error={form.errors.phone}>
-              <Input name="phone" type="tel" pattern={PHONE_PATTERN} autoComplete="tel" value={f.phone} onChange={(e) => setF((s) => ({ ...s, phone: e.target.value }))} />
+              <Input name="phone" type="tel" required pattern={PHONE_PATTERN} autoComplete="tel" value={f.phone} onChange={(e) => setF((s) => ({ ...s, phone: normalizePhone(e.target.value) }))} />
             </Field>
           </div>
 
@@ -119,7 +120,7 @@ export const PatientProfilePage = () => {
                 <Input name="emergencyContact.relation" required={contactRequired} maxLength={50} value={f.contact.relation} onChange={setContact('relation')} placeholder={t('e.g. Spouse')} />
               </Field>
               <Field label="Phone" hint={PHONE_HINT} error={form.errors['emergencyContact.phone']}>
-                <Input name="emergencyContact.phone" type="tel" required={contactRequired} pattern={PHONE_PATTERN} value={f.contact.phone} onChange={setContact('phone')} />
+                <Input name="emergencyContact.phone" type="tel" required={contactRequired} pattern={PHONE_PATTERN} value={f.contact.phone} onChange={(e) => setF((s) => ({ ...s, contact: { ...s.contact, phone: normalizePhone(e.target.value) } }))} />
               </Field>
             </div>
           </fieldset>

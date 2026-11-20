@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { authErrorMessage, authService } from '../../services/authService';
-import { cleanCode } from '../../lib/phoneLogin';
+import { cleanCode, normalizePhone } from '../../lib/phoneLogin';
 import { PHONE_HINT, PHONE_PATTERN } from '../../lib/constants';
 import { t } from '../../lib/i18n';
 import { Alert, Button, Field, Input } from '../ui';
@@ -14,7 +14,7 @@ import { Alert, Button, Field, Input } from '../ui';
 export const CodeSignIn = () => {
   const { loginWithCode } = useAuth();
   const [step, setStep] = useState<'phone' | 'code'>('phone');
-  const [phone, setPhone] = useState('+91');
+  const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -59,12 +59,12 @@ export const CodeSignIn = () => {
           <Field label="Mobile number" hint={PHONE_HINT}>
             <Input
               type="tel"
-              inputMode="tel"
+              inputMode="numeric"
               autoComplete="tel"
               required
               pattern={PHONE_PATTERN}
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => setPhone(normalizePhone(e.target.value))}
             />
           </Field>
           <Button type="submit" size="lg" className="w-full" loading={submitting}>

@@ -285,7 +285,7 @@ export const hi: Record<string, string> = {
   'Keep these up to date so your team can reach you and your emergency contact.': 'इसे अपडेट रखें ताकि आपकी टीम आप तक और आपके आपातकालीन संपर्क तक पहुँच सके।',
   'Your name': 'आपका नाम',
   'Your phone number': 'आपका फ़ोन नंबर',
-  'International format, e.g. +919876543210': 'अंतरराष्ट्रीय प्रारूप, जैसे +919876543210',
+  '10 digits, without +91, e.g. 9876543210': '10 अंक, +91 के बिना, जैसे 9876543210',
   'Emergency contact': 'आपातकालीन संपर्क',
   Name: 'नाम',
   Relationship: 'रिश्ता',

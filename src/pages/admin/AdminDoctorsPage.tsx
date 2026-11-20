@@ -7,6 +7,7 @@ import { errorMessage } from '../../services/api';
 import { qk } from '../../lib/queryClient';
 import { useFormErrors } from '../../lib/forms';
 import { PHONE_HINT, PHONE_PATTERN } from '../../lib/constants';
+import { normalizePhone } from '../../lib/phoneLogin';
 import { formatDate } from '../../lib/format';
 import { Alert, Badge, Button, ConfirmDialog, ErrorState, Field, Input, Modal, ModalActions, PageHeader, PageLoader, ScrollX } from '../../components/ui';
 import { useToast } from '../../components/ui/toast';
@@ -22,7 +23,7 @@ const RegisterDoctorModal = ({ onClose }: { onClose: () => void }) => {
   const set = (field: keyof typeof EMPTY_FORM) => (e: ChangeEvent<HTMLInputElement>) => setF((p) => ({ ...p, [field]: e.target.value }));
 
   const register = useMutation({
-    mutationFn: () => doctorService.register({ name: f.name.trim(), email: f.email.trim(), phone: f.phone.trim() || null, specialization: f.specialization.trim() || null }),
+    mutationFn: () => doctorService.register({ name: f.name.trim(), email: f.email.trim(), phone: f.phone, specialization: f.specialization.trim() || null }),
     onSuccess: (doc) => {
       toast.success(doc.invitation === 'SENT' ? `${doc.name}’s account is created. We’ve emailed them a link to set their password.` : `${doc.name}’s account is created, but the email failed. Resend it from the list.`);
       void queryClient.invalidateQueries({ queryKey: qk.doctors });
@@ -47,8 +48,8 @@ const RegisterDoctorModal = ({ onClose }: { onClose: () => void }) => {
           <Field label="Email address" error={form.errors.email}>
             <Input name="email" type="email" required autoComplete="off" value={f.email} onChange={set('email')} />
           </Field>
-          <Field label="Phone (optional)" hint={PHONE_HINT} error={form.errors.phone}>
-            <Input name="phone" type="tel" pattern={PHONE_PATTERN} value={f.phone} onChange={set('phone')} />
+          <Field label="Mobile number" hint={PHONE_HINT} error={form.errors.phone}>
+            <Input name="phone" type="tel" required pattern={PHONE_PATTERN} value={f.phone} onChange={(e) => setF((p) => ({ ...p, phone: normalizePhone(e.target.value) }))} />
           </Field>
           <Field label="Specialization (optional)" error={form.errors.specialization}>
             <Input name="specialization" maxLength={100} value={f.specialization} onChange={set('specialization')} placeholder="e.g. Surgical oncology" />

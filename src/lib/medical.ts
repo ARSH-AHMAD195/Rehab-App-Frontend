@@ -1,4 +1,5 @@
 import { splitList } from './format';
+import { normalizePhone } from './phoneLogin';
 import type { MedicalCondition, MedicalFields, MedicalProfile } from '../types/api';
 
 /** The conditions with a checkbox. The form keeps them by `value`; the API stores `code` in `conditions`. */
@@ -82,7 +83,7 @@ export const medicalToForm = (m: MedicalProfile): MedicalForm => ({
   smokingStatus: m.smokingStatus ?? '',
   ecName: m.emergencyContact?.name ?? '',
   ecRelation: m.emergencyContact?.relation ?? '',
-  ecPhone: m.emergencyContact?.phone ?? '',
+  ecPhone: normalizePhone(m.emergencyContact?.phone ?? ''),
   programmeStartDate: m.programmeStartDate ?? '',
   programmeLengthDays: m.programmeLengthDays?.toString() ?? '',
   onboardingWeightKg: m.onboardingWeightKg?.toString() ?? '',
