@@ -20,8 +20,8 @@ export const TREND_PERIODS: readonly [TrendPeriod, string][] = [
   ['90d', 'Last 90 days'],
 ];
 
-/** The Auth API wants phone numbers in E.164, e.g. +919876543210. */
-export const PHONE_PATTERN = '\\+[1-9]\\d{7,14}';
-export const PHONE_HINT = 'International format, e.g. +919876543210';
+/** Indian mobile, 10 digits without +91 (the Auth API adds it and returns +919876543210). */
+export const PHONE_PATTERN = '[6-9][0-9]{9}';
+export const PHONE_HINT = '10 digits, without +91, e.g. 9876543210';
 
 export const DEFAULT_TIME_ZONE = 'Asia/Kolkata';

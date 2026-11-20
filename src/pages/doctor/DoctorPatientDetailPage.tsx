@@ -1,8 +1,8 @@
 import { useId, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, BellOff, ClipboardList, MessageCircle, Pencil } from 'lucide-react';
-import { alertService, completionService, patientService, planService, vitalsService } from '../../services/apiServices';
+import { ArrowLeft, BellOff, ClipboardList, MessageCircle, Pencil, Salad } from 'lucide-react';
+import { alertService, completionService, nutritionService, patientService, planService, vitalsService } from '../../services/apiServices';
 import { ApiError, errorMessage } from '../../services/api';
 import { qk } from '../../lib/queryClient';
 import { useFormErrors } from '../../lib/forms';
@@ -27,6 +27,7 @@ import { ExerciseTimeline } from '../../components/doctor/ExerciseTimeline';
 import { InvestigationsPanel } from '../../components/doctor/InvestigationsPanel';
 import { TriageCard } from '../../components/doctor/TriageCard';
 import { NutritionPanel } from '../../components/doctor/NutritionPanel';
+import { DietPlanModal } from '../../components/doctor/DietPlanModal';
 import { CareAlertsCard } from '../../components/doctor/CareAlertsCard';
 import { completeDays } from '../../lib/compliance';
 import type { MedicalProfile } from '../../types/api';
@@ -113,13 +114,15 @@ export const DoctorPatientDetailPage = () => {
   const toast = useToast();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [modal, setModal] = useState<'plan' | 'medical' | null>(null);
+  const [modal, setModal] = useState<'plan' | 'medical' | 'diet' | null>(null);
   const vitalLabel = useVitalLabel();
 
   // The active tab lives in the URL so it survives reloads and works with Back
   const requested = searchParams.get('tab') as TabKey | null;
   const tab: TabKey = requested && TAB_IDS.includes(requested) ? requested : 'overview';
   const setTab = (next: TabKey) => setSearchParams(next === 'overview' ? {} : { tab: next }, { replace: true });
+  // Same cache entry as NutritionPanel's, so this costs no extra request
+  const dietPlan = useQuery({ queryKey: qk.patientPart(patientId, 'nutrition', 'plan'), queryFn: () => nutritionService.getPatientPlan(patientId), enabled: tab === 'nutrition' });
 
   const patient = useQuery({ queryKey: qk.patient(patientId), queryFn: () => patientService.get(patientId) });
   const medical = useQuery({ queryKey: qk.patientPart(patientId, 'medical'), queryFn: () => patientService.getMedical(patientId) });
@@ -450,10 +453,17 @@ export const DoctorPatientDetailPage = () => {
           </div>
           <div className="flex flex-wrap items-start gap-3">
             <MyPatientToggle patient={p} />
-            <Button size="sm" onClick={() => setModal('plan')} disabled={!plan.data}>
-              <ClipboardList className="h-4 w-4" aria-hidden="true" />
-              {plan.data?.version ? 'Change exercise plan' : 'Assign exercise plan'}
-            </Button>
+            {tab === 'nutrition' ? (
+              <Button size="sm" onClick={() => setModal('diet')} disabled={!dietPlan.data}>
+                <Salad className="h-4 w-4" aria-hidden="true" />
+                Change diet plan
+              </Button>
+            ) : (
+              <Button size="sm" onClick={() => setModal('plan')} disabled={!plan.data}>
+                <ClipboardList className="h-4 w-4" aria-hidden="true" />
+                {plan.data?.version ? 'Change exercise plan' : 'Assign exercise plan'}
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -479,6 +489,7 @@ export const DoctorPatientDetailPage = () => {
 
       {modal === 'plan' && plan.data && <PlanEditorModal patientId={patientId} plan={plan.data} onClose={() => setModal(null)} />}
       {modal === 'medical' && <EditMedicalModal patientId={patientId} onClose={() => setModal(null)} />}
+      {modal === 'diet' && dietPlan.data && <DietPlanModal patientId={patientId} plan={dietPlan.data} onClose={() => setModal(null)} />}
     </div>
   );
 };

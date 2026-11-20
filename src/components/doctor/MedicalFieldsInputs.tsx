@@ -1,5 +1,6 @@
 import type { ChangeEvent } from 'react';
 import { PHONE_HINT, PHONE_PATTERN } from '../../lib/constants';
+import { normalizePhone } from '../../lib/phoneLogin';
 import { labelize, localDateKey } from '../../lib/format';
 import { Field, Input, Select, Textarea } from '../ui';
 import { BLOOD_GROUPS, IHD_STATUSES, SEXES, SMOKING_STATUSES } from '../../types/api';
@@ -195,7 +196,7 @@ export const MedicalFieldsInputs = ({
             <Input name="emergencyContact.relation" required={contactRequired} maxLength={50} value={f.ecRelation} onChange={set('ecRelation')} placeholder={example('e.g. Spouse')} />
           </Field>
           <Field label="Phone" hint={PHONE_HINT} error={errors['emergencyContact.phone']}>
-            <Input name="emergencyContact.phone" type="tel" required={contactRequired} pattern={PHONE_PATTERN} value={f.ecPhone} onChange={set('ecPhone')} />
+            <Input name="emergencyContact.phone" type="tel" required={contactRequired} pattern={PHONE_PATTERN} value={f.ecPhone} onChange={(e) => onChange({ ...f, ecPhone: normalizePhone(e.target.value) })} />
           </Field>
         </div>
       </fieldset>

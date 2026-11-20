@@ -11,13 +11,22 @@ const TAGS: Record<TriageTag, { label: string; tone: 'rose' | 'amber' | 'emerald
   LOW: { label: 'Low', tone: 'emerald' },
 };
 
+/**
+ * The API says LOW whenever nothing reached a cut-off, even with no values at all. LOW with values
+ * missing is just "nothing known", so it isn't shown; HIGH and MEDIUM can only rise, so they always are.
+ */
+const hasTag = (triage: TriageSummary | null | undefined): triage is TriageSummary => Boolean(triage) && (triage!.complete || triage!.tag !== 'LOW');
+
 /** The tag; worked out with missing values, it's marked incomplete (it could rise once they're in). */
-export const TriageBadge = ({ triage }: { triage: TriageSummary }) => (
+export const TriageBadge = ({ triage }: { triage: TriageSummary | null | undefined }) =>
+  !hasTag(triage) ? (
+    <span className="text-slate-500">—</span>
+  ) : (
   <span className="inline-flex flex-wrap items-center gap-1">
     <Badge tone={TAGS[triage.tag].tone}>{TAGS[triage.tag].label}</Badge>
     {!triage.complete && <Badge tone="slate">Incomplete</Badge>}
   </span>
-);
+  );
 
 const Reasons = ({ title, items, className }: { title: string; items: Triage['reasons']; className: string }) =>
   items.length > 0 && (
@@ -50,7 +59,7 @@ export const TriageCard = ({ patientId }: { patientId: string }) => {
         title="Triage"
         as="h3"
         description={`${provisional ? 'Draft rules, pending clinical sign-off. ' : ''}As of ${formatDate(evaluatedOn)}`}
-        actions={<TriageBadge triage={triage.data} />}
+        actions={hasTag(triage.data) ? <TriageBadge triage={triage.data} /> : <span className="text-sm text-slate-600">Not enough values yet</span>}
       />
       <div className="grid gap-4 sm:grid-cols-3">
         <Reasons title="High" items={reasons.filter((r) => r.level === 'HIGH')} className="text-rose-800" />
