@@ -2,9 +2,10 @@ import { useId, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, BellOff, ClipboardList, MessageCircle, Pencil, Salad } from 'lucide-react';
-import { alertService, completionService, nutritionService, patientService, planService, vitalsService } from '../../services/apiServices';
+import { alertService, completionService, patientService, planService, vitalsService } from '../../services/apiServices';
 import { ApiError, errorMessage } from '../../services/api';
 import { qk } from '../../lib/queryClient';
+import { usePatientDietPlan } from '../../lib/hooks';
 import { useFormErrors } from '../../lib/forms';
 import { useVitalLabel } from '../../lib/vitals';
 import { conditionNames, formToMedical, medicalChanges, medicalToForm, type MedicalForm } from '../../lib/medical';
@@ -121,8 +122,7 @@ export const DoctorPatientDetailPage = () => {
   const requested = searchParams.get('tab') as TabKey | null;
   const tab: TabKey = requested && TAB_IDS.includes(requested) ? requested : 'overview';
   const setTab = (next: TabKey) => setSearchParams(next === 'overview' ? {} : { tab: next }, { replace: true });
-  // Same cache entry as NutritionPanel's, so this costs no extra request
-  const dietPlan = useQuery({ queryKey: qk.patientPart(patientId, 'nutrition', 'plan'), queryFn: () => nutritionService.getPatientPlan(patientId), enabled: tab === 'nutrition' });
+  const dietPlan = usePatientDietPlan(patientId, tab === 'nutrition');
 
   const patient = useQuery({ queryKey: qk.patient(patientId), queryFn: () => patientService.get(patientId) });
   const medical = useQuery({ queryKey: qk.patientPart(patientId, 'medical'), queryFn: () => patientService.getMedical(patientId) });

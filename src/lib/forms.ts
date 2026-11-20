@@ -49,6 +49,14 @@ export const useFormErrors = () => {
     });
   }, []);
 
+  /** A check the browser can't do, such as one field compared with another. */
+  const setFieldError = useCallback((name: string, message: string) => setErrors((prev) => ({ ...prev, [name]: t(message) })), []);
+
+  const clearAll = useCallback(() => {
+    setErrors({});
+    setFormError('');
+  }, []);
+
   /** Shows a failed request: field-level messages where the server provided them. */
   const fromApiError = useCallback((err: unknown, fallback?: string) => {
     const fieldErrors = err instanceof ApiError ? err.fieldErrors : {};
@@ -59,5 +67,5 @@ export const useFormErrors = () => {
   /** Clears a field's message as soon as the user edits it. Spread onto <form>. */
   const onChange = useCallback((e: FormEvent<HTMLFormElement>) => clear((e.target as HTMLInputElement).name), [clear]);
 
-  return { errors, formError, setFormError, validate, clear, fromApiError, onChange };
+  return { errors, formError, setFormError, setFieldError, validate, clear, clearAll, fromApiError, onChange };
 };

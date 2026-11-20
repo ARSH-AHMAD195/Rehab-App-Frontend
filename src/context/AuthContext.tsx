@@ -4,7 +4,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { firebaseAuth } from '../lib/firebase';
 import { authService, isAccountRejection } from '../services/authService';
 import { onUnauthorized } from '../services/api';
-import { idleExpired, writeLastActivity } from '../lib/idle';
+import { idleExpired, idleSignOutApplies, readLastActivity, writeLastActivity } from '../lib/idle';
 import { setMonitoringUser } from '../lib/monitoring';
 import type { User } from '../types/api';
 
@@ -15,6 +15,9 @@ interface AuthValue {
   loading: boolean;
   /** Why the last session ended without the user signing out, for the login page message. */
   endReason: EndReason;
+  /** A saved session couldn't be checked (network or a sleeping API); it's kept, and can be retried. */
+  restoreError: unknown;
+  retryRestore: () => Promise<void>;
   login: (credentials: { email: string; password: string }) => Promise<User>;
   /** Patients: mobile number + a code from their doctor. */
   loginWithCode: (credentials: { phone: string; code: string }) => Promise<User>;
@@ -30,6 +33,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [endReason, setEndReason] = useState<EndReason>(null);
+  const [restoreError, setRestoreError] = useState<unknown>(null);
 
   const signedIn = useCallback((next: User) => {
     setUser(next);
@@ -48,28 +52,52 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     [queryClient]
   );
 
+  // Set while login()/loginWithCode() run: they fetch /auth/me themselves, so the listener needn't.
+  const signingIn = useRef(false);
+
+  /** Who a restored Firebase session belongs to. Health data only loads once `user` is set. */
+  const restore = useCallback(async () => {
+    setRestoreError(null);
+    // Judged now, before any wait: a sign-in started meanwhile on the login page refreshes the stamp
+    const expired = idleExpired();
+    const uid = firebaseAuth.currentUser?.uid;
+    try {
+      const me = await authService.getMe();
+      // Someone else signed in while this was loading: their sign-in sets the user, not this
+      if (firebaseAuth.currentUser?.uid !== uid) return;
+      // Left signed in with the tab closed
+      if (idleSignOutApplies(me) && expired) {
+        await authService.logout().catch(() => {});
+        signedOut('idle');
+      } else {
+        signedIn(me);
+      }
+    } catch (err) {
+      // Only end the Firebase session if the account itself was refused. A network error or a
+      // sleeping API keeps it, and the app offers to try again.
+      if (isAccountRejection(err)) await authService.logout().catch(() => {});
+      else setRestoreError(err);
+      setUser(null);
+    }
+  }, [signedIn, signedOut]);
+
   // Firebase restores a saved session on load; the Auth API tells us who that is.
   useEffect(
     () =>
       onAuthStateChanged(firebaseAuth, async (firebaseUser) => {
-        if (firebaseUser && idleExpired()) {
-          // Left signed in with the tab closed: end it here, before any health data loads
-          await authService.logout().catch(() => {});
-          signedOut('idle');
-        } else if (firebaseUser) {
-          try {
-            signedIn(await authService.getMe());
-          } catch (err) {
-            // Only end the Firebase session if the account itself was refused. A network error or a
-            // sleeping API keeps it, so the next load can try again without asking for the password.
-            if (isAccountRejection(err)) await authService.logout().catch(() => {});
-            setUser(null);
-          }
-        }
+        if (firebaseUser && !signingIn.current) await restore();
+        if (!firebaseUser) setRestoreError(null);
         setLoading(false);
       }),
-    [signedIn, signedOut]
+    [restore]
   );
+
+  const retryRestore = useCallback(async () => {
+    setLoading(true);
+    if (firebaseAuth.currentUser) await restore();
+    else setRestoreError(null);
+    setLoading(false);
+  }, [restore]);
 
   // A 401 from any API means the session ended (expired, revoked or account deactivated).
   const userRef = useRef(user);
@@ -83,13 +111,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => onUnauthorized(() => {});
   }, [signedOut]);
 
-  /** Every sign-in: record activity first, so it isn't judged by the last session's idle time. */
+  /**
+   * Every sign-in: record activity first, so it isn't judged by the last session's idle time. A failed
+   * attempt puts the old time back, or it would revive an idle session still saved on this device.
+   */
   const signIn = useCallback(
     async (attempt: () => Promise<User>) => {
+      const previous = readLastActivity();
       writeLastActivity();
-      const next = await attempt();
-      signedIn(next);
-      return next;
+      signingIn.current = true;
+      try {
+        const next = await attempt();
+        signedIn(next);
+        return next;
+      } catch (err) {
+        writeLastActivity(previous);
+        throw err;
+      } finally {
+        signingIn.current = false;
+      }
     },
     [signedIn]
   );
@@ -111,8 +151,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [signedIn]);
 
   const value = useMemo(
-    () => ({ user, loading, endReason, login, loginWithCode, logout, recheckVerification }),
-    [user, loading, endReason, login, loginWithCode, logout, recheckVerification]
+    () => ({ user, loading, endReason, restoreError, retryRestore, login, loginWithCode, logout, recheckVerification }),
+    [user, loading, endReason, restoreError, retryRestore, login, loginWithCode, logout, recheckVerification]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -6,6 +6,7 @@ import { useSignedInUser, useAuth } from '../context/AuthContext';
 import { MedicalDisclaimer } from '../components/common/MedicalDisclaimer';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { IdleLogout } from '../components/IdleLogout';
+import { idleSignOutApplies } from '../lib/idle';
 import { InstallButton } from '../components/pwa/PwaPrompts';
 import { cn } from '../lib/cn';
 import { firstName, initials } from '../lib/format';
@@ -238,7 +239,7 @@ export const DashboardLayout = () => {
       </div>
 
       <BottomTabs items={navItems} counts={counts} />
-      <IdleLogout />
+      {idleSignOutApplies(user) && <IdleLogout />}
     </div>
   );
 };
