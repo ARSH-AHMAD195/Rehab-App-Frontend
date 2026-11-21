@@ -132,20 +132,30 @@ const MedicationNotes = ({ patientId, medical }: { patientId: string; medical: M
   const form = useFormErrors();
   const saved = medical.medications?.join('\n') ?? '';
   const [text, setText] = useState(saved);
+  const [base, setBase] = useState(saved);
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+  // When the saved notes change (this save, or someone else's), show them, unless the doctor has unsaved typing
+  if (saved !== base) {
+    if (text === base) setText(saved);
+    setBase(saved);
+  }
 
   const save = useMutation({
-    mutationFn: () => {
-      const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
-      return patientService.updateMedical(patientId, { version: medical.version, medications: lines.length ? lines : null });
-    },
-    onSuccess: () => {
+    mutationFn: () => patientService.updateMedical(patientId, { version: medical.version, medications: lines.length ? lines : null }),
+    onSuccess: (m) => {
       toast.success('Medication notes saved.');
+      // Show what was stored (trimmed, blank lines dropped), so the box isn't left "changed"
+      const stored = m.medications?.join('\n') ?? '';
+      setText(stored);
+      setBase(stored);
+      queryClient.setQueryData(qk.patientPart(patientId, 'medical'), m);
       void queryClient.invalidateQueries({ queryKey: qk.patient(patientId) });
     },
     onError: (err) => {
       if (err instanceof ApiError && err.code === 'CONCURRENT_UPDATE') {
+        // Loads their version; the typed text stays, and saving again replaces theirs
         void queryClient.invalidateQueries({ queryKey: qk.patient(patientId) });
-        return form.setFormError('Someone else changed these details while you were editing. Your text is still here: copy it, then reload the page.');
+        return form.setFormError('Someone else saved changes to this patient while you were typing. Your text is still in the box: Save again to replace their notes, or reload to see them.');
       }
       form.fromApiError(err, 'Could not save the medication notes.');
     },
@@ -165,7 +175,7 @@ const MedicationNotes = ({ patientId, medical }: { patientId: string; medical: M
           <Textarea name="medications" rows={4} value={text} onChange={(e) => setText(e.target.value)} placeholder="e.g. Metformin 500 mg twice daily" />
         </Field>
         <div className="flex justify-end">
-          <Button type="submit" size="sm" loading={save.isPending} disabled={text.trim() === saved.trim()}>
+          <Button type="submit" size="sm" loading={save.isPending} disabled={lines.join('\n') === saved}>
             Save
           </Button>
         </div>
@@ -266,8 +276,7 @@ export const InvestigationsPanel = ({ patientId, medical }: { patientId: string;
         </Card>
       ))}
 
-      {/* Remount on a new version, so the box shows what was saved (by this doctor or the medical details form) */}
-      {medical && <MedicationNotes key={medical.version} patientId={patientId} medical={medical} />}
+      {medical && <MedicationNotes patientId={patientId} medical={medical} />}
 
       {adding && <AddResultModal patientId={patientId} test={adding} onClose={() => setAdding(null)} />}
       {retracting && (
