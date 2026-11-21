@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Plus, X } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import { clinicalService, patientService } from '../../services/apiServices';
-import { errorMessage } from '../../services/api';
+import { ApiError, errorMessage } from '../../services/api';
 import { useFormErrors } from '../../lib/forms';
 import { cn } from '../../lib/cn';
 import { dateKeyIn, formatDate, labelize } from '../../lib/format';
@@ -10,7 +10,7 @@ import { formatResult, GROUP_TITLES, testUnits } from '../../lib/investigations'
 import { qk } from '../../lib/queryClient';
 import { Alert, Button, Card, ConfirmDialog, Field, Input, Modal, ModalActions, PageLoader, SectionTitle, Select, Textarea } from '../ui';
 import { useToast } from '../ui/toast';
-import type { InvestigationField, InvestigationGroup, InvestigationResult, InvestigationTest } from '../../types/api';
+import type { InvestigationField, InvestigationGroup, InvestigationResult, InvestigationTest, MedicalProfile } from '../../types/api';
 
 const useRefreshAfterChange = (patientId: string) => {
   const queryClient = useQueryClient();
@@ -125,9 +125,57 @@ const AddResultModal = ({ patientId, test, onClose }: { patientId: string; test:
   );
 };
 
+/** Saves only the medications (one per line) from the card, instead of the whole medical details form. */
+const MedicationNotes = ({ patientId, medical }: { patientId: string; medical: MedicalProfile }) => {
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  const form = useFormErrors();
+  const saved = medical.medications?.join('\n') ?? '';
+  const [text, setText] = useState(saved);
+
+  const save = useMutation({
+    mutationFn: () => {
+      const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+      return patientService.updateMedical(patientId, { version: medical.version, medications: lines.length ? lines : null });
+    },
+    onSuccess: () => {
+      toast.success('Medication notes saved.');
+      void queryClient.invalidateQueries({ queryKey: qk.patient(patientId) });
+    },
+    onError: (err) => {
+      if (err instanceof ApiError && err.code === 'CONCURRENT_UPDATE') {
+        void queryClient.invalidateQueries({ queryKey: qk.patient(patientId) });
+        return form.setFormError('Someone else changed these details while you were editing. Your text is still here: copy it, then reload the page.');
+      }
+      form.fromApiError(err, 'Could not save the medication notes.');
+    },
+  });
+
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (form.validate(e.currentTarget)) save.mutate();
+  };
+
+  return (
+    <Card>
+      <SectionTitle title="Medication notes" as="h3" />
+      <form noValidate onSubmit={handleSubmit} onChange={form.onChange} className="space-y-3">
+        {form.formError && <Alert tone="error">{form.formError}</Alert>}
+        <Field label="Medications and notes" hint="One per line, up to 200 characters each" error={form.errors.medications}>
+          <Textarea name="medications" rows={4} value={text} onChange={(e) => setText(e.target.value)} placeholder="e.g. Metformin 500 mg twice daily" />
+        </Field>
+        <div className="flex justify-end">
+          <Button type="submit" size="sm" loading={save.isPending} disabled={text.trim() === saved.trim()}>
+            Save
+          </Button>
+        </div>
+      </form>
+    </Card>
+  );
+};
+
 const ResultChip = ({ test, result, onRetract }: { test: InvestigationTest | undefined; result: InvestigationResult; onRetract: () => void }) => (
   <span
-    title={result.comment ?? undefined}
     className={cn('inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-xs', result.outOfRange ? 'border-rose-300 bg-rose-50 text-rose-900' : 'border-slate-200 bg-slate-50 text-slate-800')}
   >
     <span>
@@ -136,6 +184,7 @@ const ResultChip = ({ test, result, onRetract }: { test: InvestigationTest | und
         {result.outOfRange && <span className="sr-only"> (outside the normal range)</span>}
       </span>
       <span className="block text-slate-600">{formatDate(result.takenOn, { day: 'numeric', month: 'short', year: '2-digit' })}</span>
+      {result.comment && <span className="block max-w-56 whitespace-pre-line text-slate-700 [overflow-wrap:anywhere]">{result.comment}</span>}
     </span>
     <button
       type="button"
@@ -149,7 +198,7 @@ const ResultChip = ({ test, result, onRetract }: { test: InvestigationTest | und
 );
 
 /** The PAC investigation grid: every test with its dated results, newest first. Red only against ranges the clinic approved. */
-export const InvestigationsPanel = ({ patientId, medications, onEditMedications }: { patientId: string; medications: string[] | null | undefined; onEditMedications: () => void }) => {
+export const InvestigationsPanel = ({ patientId, medical }: { patientId: string; medical: MedicalProfile | undefined }) => {
   const toast = useToast();
   const refresh = useRefreshAfterChange(patientId);
   const [adding, setAdding] = useState<InvestigationTest | null>(null);
@@ -217,19 +266,8 @@ export const InvestigationsPanel = ({ patientId, medications, onEditMedications 
         </Card>
       ))}
 
-      <Card>
-        <SectionTitle
-          title="Medication assigned"
-          as="h3"
-          actions={
-            <Button size="sm" variant="subtle" onClick={onEditMedications}>
-              <Pencil className="h-4 w-4 text-teal-800" aria-hidden="true" />
-              Edit
-            </Button>
-          }
-        />
-        <p className="text-sm text-slate-800 [overflow-wrap:anywhere]">{medications?.join('; ') || 'None documented'}</p>
-      </Card>
+      {/* Remount on a new version, so the box shows what was saved (by this doctor or the medical details form) */}
+      {medical && <MedicationNotes key={medical.version} patientId={patientId} medical={medical} />}
 
       {adding && <AddResultModal patientId={patientId} test={adding} onClose={() => setAdding(null)} />}
       {retracting && (
