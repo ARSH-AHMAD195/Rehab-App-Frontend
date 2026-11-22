@@ -134,7 +134,7 @@ export const DietPlanModal = ({ patientId, plan, onClose }: { patientId: string;
   const gapText = gap < 0 ? `${-gap} kcal short` : gap > 0 ? `${gap} kcal over` : 'matches the target';
 
   return (
-    <Modal title="Change diet plan" description="For this patient only. Days already logged keep the values they were logged with." onClose={onClose} size="xl">
+    <Modal title="Change diet plan" description="For this patient only. Days already logged keep the values they were logged with, so if the patient has ticked a meal today, the changes show from tomorrow." onClose={onClose} size="xl">
       <form noValidate onSubmit={handleSubmit} onChange={form.onChange} className="space-y-4">
         {form.formError && <Alert tone="error">{form.formError}</Alert>}
         <div className="grid gap-4 sm:grid-cols-2">

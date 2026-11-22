@@ -21,7 +21,7 @@ export const LogsTable = ({ logs, emptyMessage = 'Nothing logged in this period.
             {columns.map((c) => (
               <th key={c.type} scope="col" className="whitespace-nowrap pb-3 pr-4">
                 {vitalName(c.type, c.label)}
-                {c.unit && <span className="block font-normal normal-case">{c.unit}</span>}
+                {c.unit && <span className="block font-normal normal-case">{t(c.unit)}</span>}
               </th>
             ))}
           </tr>

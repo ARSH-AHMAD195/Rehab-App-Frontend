@@ -12,6 +12,8 @@ const isStaleChunk = (error: unknown) =>
 export const RouteError = () => {
   const error = useRouteError();
   const staleChunk = isStaleChunk(error);
+  // Offline, a chunk that isn't cached fails the same way: that's no new version
+  const offline = staleChunk && !navigator.onLine;
 
   useEffect(() => {
     if (!staleChunk && !isRouteErrorResponse(error)) reportError(error);
@@ -21,9 +23,11 @@ export const RouteError = () => {
     <main className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
       <div role="alert" className="max-w-md rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
         <AlertTriangle className="mx-auto h-8 w-8 text-amber-600" aria-hidden="true" />
-        <h1 className="mt-3 text-lg font-bold text-slate-900">{staleChunk ? 'A new version is available' : 'Something went wrong'}</h1>
+        <h1 className="mt-3 text-lg font-bold text-slate-900">{offline ? 'You’re offline' : staleChunk ? 'A new version is available' : 'Something went wrong'}</h1>
         <p className="mt-1 text-sm text-slate-600">
-          {staleChunk
+          {offline
+            ? 'This page needs a connection to load. Reconnect, then reload.'
+            : staleChunk
             ? 'Fit for Surgery was updated while this page was open. Reload to continue.'
             : 'An unexpected error occurred while displaying this page. Your saved data is not affected.'}
         </p>
