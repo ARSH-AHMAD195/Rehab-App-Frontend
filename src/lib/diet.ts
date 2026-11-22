@@ -1,3 +1,5 @@
+import type { MealSlot } from '../types/api';
+
 /**
  * A code for a new meal slot or food option, from its English name: "Evening snack" → "EVENING_SNACK".
  * The API wants 1-40 of A-Z, 0-9 and _, unique within the list, so a clash gets _2, _3…
@@ -9,4 +11,65 @@ export const newCode = (label: string, taken: Iterable<string>) => {
   let code = base;
   for (let n = 2; used.has(code); n++) code = `${base}_${n}`;
   return code;
+};
+
+/** Form rows: numbers as typed, and an empty code for anything added here (made on save).
+ * Hindi isn't edited here: saved Hindi goes back unchanged, and the form clears it when the English is renamed. */
+export type OptionRow = { code: string; en: string; hi: string; quantity: string };
+export type SlotRow = { code: string; en: string; hi: string; from: string; to: string; kcal: string; protein: string; options: OptionRow[] };
+
+export const EMPTY_OPTION: OptionRow = { code: '', en: '', hi: '', quantity: '' };
+
+export const toRows = (slots: MealSlot[]): SlotRow[] =>
+  slots.map((s) => {
+    const [from = '', to = ''] = s.window.split('-');
+    return {
+      code: s.code,
+      en: s.label.en,
+      hi: s.label.hi ?? '',
+      from,
+      to,
+      kcal: String(s.kcal),
+      protein: String(s.proteinG),
+      options: s.options.map((o) => ({ code: o.code, en: o.label.en, hi: o.label.hi ?? '', quantity: o.quantity })),
+    };
+  });
+
+/** A typed number; blank or invalid counts as 0. */
+const num = (v: string) => {
+  const n = Number(v);
+  return v.trim() !== '' && Number.isFinite(n) ? n : 0;
+};
+
+/** Sum of all meals as shown in the summary: kcal to a whole number, protein to 1 dp. */
+export const sumMeals = (rows: SlotRow[]) => ({
+  kcal: Math.round(rows.reduce((sum, r) => sum + num(r.kcal), 0)),
+  protein: Math.round(rows.reduce((sum, r) => sum + num(r.protein), 0) * 10) / 10,
+});
+
+/** Meal kcal minus the daily kcal target: negative is short, positive is over, 0 matches. */
+export const kcalGap = (rows: SlotRow[], targetKcal: string) => sumMeals(rows).kcal - Math.round(num(targetKcal));
+
+const text = (en: string, hi: string) => ({ en: en.trim(), hi: hi.trim() || null });
+
+export const toSlots = (rows: SlotRow[]): MealSlot[] => {
+  const slotCodes = rows.map((r) => r.code).filter(Boolean);
+  return rows.map((r) => {
+    const code = r.code || newCode(r.en, slotCodes);
+    if (!r.code) slotCodes.push(code);
+    const optionCodes = r.options.map((o) => o.code).filter(Boolean);
+    return {
+      code,
+      label: text(r.en, r.hi),
+      window: `${r.from}-${r.to}`,
+      kcal: Number(r.kcal),
+      proteinG: Number(r.protein),
+      options: r.options.map((o) => {
+        const optionCode = o.code || newCode(o.en, optionCodes);
+        if (!o.code) optionCodes.push(optionCode);
+        // Every food is a main option: the add-on type was dropped from the form
+        return { code: optionCode, label: text(o.en, o.hi), quantity: o.quantity.trim(), kind: 'OPTION' as const };
+      }),
+    };
+  });
 };

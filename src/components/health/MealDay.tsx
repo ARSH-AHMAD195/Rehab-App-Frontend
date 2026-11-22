@@ -1,4 +1,5 @@
-import { CheckCircle2, Circle } from 'lucide-react';
+import { useId, useState, type ReactNode } from 'react';
+import { CheckCircle2, ChevronDown, Circle } from 'lucide-react';
 import { biText, t } from '../../lib/i18n';
 import { formatDate } from '../../lib/format';
 import { cn } from '../../lib/cn';
@@ -86,20 +87,56 @@ export const MealSlots = ({ day, onToggle, busySlot }: { day: MealDay; onToggle?
   </div>
 );
 
-/** One line per day, newest first: how much of the calorie and protein targets was eaten. */
-export const MealHistory = ({ days }: { days: MealHistoryDay[] }) => (
-  <ul className="divide-y divide-slate-100 text-sm">
-    {days.map((d) => (
-      <li key={d.date} className="flex flex-wrap items-center justify-between gap-2 py-2">
-        <span className="font-semibold text-slate-900">{formatDate(d.date, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
-        {d.logged && d.percent ? (
-          <span className={cn('text-slate-700', (d.percent.kcal ?? 0) < 75 && 'font-semibold text-amber-800')}>
-            {t('{kcal}% calories · {protein}% protein', { kcal: d.percent.kcal ?? 0, protein: d.percent.protein ?? 0 })}
-          </span>
-        ) : (
-          <span className="text-slate-500">{t('Nothing ticked')}</span>
-        )}
-      </li>
-    ))}
-  </ul>
-);
+/**
+ * One line per day, newest first: how much of the calorie and protein targets was eaten.
+ * With `detail` (doctor) each day opens inline to show it; without, plain lines (patient).
+ */
+export const MealHistory = ({ days, detail }: { days: MealHistoryDay[]; detail?: (day: MealHistoryDay) => ReactNode }) => {
+  const [open, setOpen] = useState<string | null>(null);
+  const baseId = useId();
+  const row = 'flex flex-wrap items-center justify-between gap-2 py-2';
+  return (
+    <ul className="divide-y divide-slate-100 text-sm">
+      {days.map((d) => {
+        const summary = (
+          <>
+            <span className="font-semibold text-slate-900">{formatDate(d.date, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+            {d.logged && d.percent ? (
+              <span className={cn('text-slate-700', (d.percent.kcal ?? 0) < 75 && 'font-semibold text-amber-800')}>
+                {t('{kcal}% calories · {protein}% protein', { kcal: d.percent.kcal ?? 0, protein: d.percent.protein ?? 0 })}
+              </span>
+            ) : (
+              <span className="text-slate-500">{t('Nothing ticked')}</span>
+            )}
+          </>
+        );
+        if (!detail) {
+          return (
+            <li key={d.date} className={row}>
+              {summary}
+            </li>
+          );
+        }
+        const expanded = open === d.date;
+        const panel = `${baseId}-${d.date}`;
+        return (
+          <li key={d.date}>
+            <button
+              type="button"
+              aria-expanded={expanded}
+              aria-controls={panel}
+              onClick={() => setOpen(expanded ? null : d.date)}
+              className="flex min-h-11 w-full items-center gap-2 rounded-lg px-2 text-left hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600"
+            >
+              <span className={cn(row, 'flex-1')}>{summary}</span>
+              <ChevronDown className={cn('h-4 w-4 shrink-0 text-slate-500 transition-transform', expanded && 'rotate-180')} aria-hidden="true" />
+            </button>
+            <div id={panel} hidden={!expanded} className="px-2 pb-3">
+              {expanded && detail(d)}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+};

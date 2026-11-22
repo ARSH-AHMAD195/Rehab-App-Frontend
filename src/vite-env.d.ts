@@ -11,6 +11,8 @@ interface ImportMetaEnv {
   readonly VITE_SENTRY_DSN?: string;
   readonly VITE_IDLE_TIMEOUT_MINUTES?: string;
   readonly VITE_APP_VERSION?: string;
+  /** 'true' shows the doctor's "Enter today's vitals" form (needs PUT /doctor/patients/:id/vitals/today) */
+  readonly VITE_DOCTOR_VITALS?: string;
 }
 
 interface ImportMeta {

@@ -43,8 +43,22 @@ const changesBetween = (defs: VitalTypeDef[], before: Record<string, string>, af
 const rangeHint = (def: VitalTypeDef) =>
   def.valueKind === 'text' ? undefined : def.minValid !== undefined ? `${def.minValid}–${def.maxValid}${def.unit ? ` ${def.unit}` : ''}` : (def.unit ?? undefined);
 
+type SavedLog = DailyLog & { alerts: SavedAlert[] };
+
+/** Whose today the form loads and saves. */
+export interface VitalsSource {
+  todayKey: readonly unknown[];
+  loadToday: () => Promise<DailyLog>;
+  save: (date: string, readings: ReadingChanges) => Promise<SavedLog>;
+  /** Refreshed after a save */
+  invalidate: (readonly unknown[])[];
+}
+
+/** The signed-in patient's own log. */
+const ownVitals: VitalsSource = { todayKey: qk.myToday, loadToday: vitalsService.getToday, save: vitalsService.saveToday, invalidate: [['my', 'vitals']] };
+
 /** Today's daily log: every reading the clinic asks for, pre-filled with what's already saved. */
-export const VitalsForm = ({ onSaved }: { onSaved?: () => void }) => {
+export const VitalsForm = ({ onSaved, source = ownVitals }: { onSaved?: (log: SavedLog) => void; source?: VitalsSource }) => {
   const toast = useToast();
   const queryClient = useQueryClient();
   const form = useFormErrors();
@@ -52,7 +66,7 @@ export const VitalsForm = ({ onSaved }: { onSaved?: () => void }) => {
 
   const types = useVitalTypes();
   const vitalLabel = useVitalLabel();
-  const today = useQuery({ queryKey: qk.myToday, queryFn: vitalsService.getToday });
+  const today = useQuery({ queryKey: source.todayKey, queryFn: source.loadToday });
   const defs = useMemo(() => (types.data ?? []).filter((d) => d.onForm), [types.data]);
   const saved = useMemo(() => toInputs(today.data, defs), [today.data, defs]);
   // Only what the patient has typed, over what's saved: never out of step with the server data
@@ -61,14 +75,14 @@ export const VitalsForm = ({ onSaved }: { onSaved?: () => void }) => {
   const setValue = (name: string, value: string) => setEdits((e) => ({ ...e, [name]: value }));
 
   const save = useMutation({
-    mutationFn: (changes: ReadingChanges) => vitalsService.saveToday(today.data!.date, changes),
+    mutationFn: (changes: ReadingChanges) => source.save(today.data!.date, changes),
     onSuccess: (log) => {
       setAlerts(log.alerts);
       setEdits({});
-      queryClient.setQueryData(qk.myToday, log);
-      void queryClient.invalidateQueries({ queryKey: ['my', 'vitals'] });
+      queryClient.setQueryData(source.todayKey, log);
+      for (const queryKey of source.invalidate) void queryClient.invalidateQueries({ queryKey });
       if (!log.alerts.length) toast.success(t('Today’s readings are saved.'));
-      onSaved?.();
+      onSaved?.(log);
     },
     onError: (err) => {
       // Midnight passed while the form was open: load the new day instead of saving to the wrong one
