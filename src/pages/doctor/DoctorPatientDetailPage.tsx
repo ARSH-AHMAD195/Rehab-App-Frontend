@@ -276,7 +276,7 @@ export const DoctorPatientDetailPage = () => {
         </Card>
       </div>
     ),
-    investigations: <InvestigationsPanel patientId={patientId} medications={m?.medications} onEditMedications={() => setModal('medical')} />,
+    investigations: <InvestigationsPanel patientId={patientId} medical={m} />,
     nutrition: <NutritionPanel patientId={patientId} />,
     exercises: (
       <div className="space-y-6">
