@@ -29,6 +29,8 @@ export interface User {
   active: boolean;
   /** LOGIN_CODE: signed in with a doctor's code, so there's no email to verify. */
   loginMethod: 'PASSWORD' | 'LOGIN_CODE';
+  /** Patients: have they set a password yet? null for staff. */
+  hasPassword: boolean | null;
 }
 
 /** GET /users/me/profile */

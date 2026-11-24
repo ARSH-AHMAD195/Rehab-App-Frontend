@@ -21,6 +21,12 @@ interface AuthValue {
   login: (credentials: { email: string; password: string }) => Promise<User>;
   /** Patients: mobile number + a code from their doctor. */
   loginWithCode: (credentials: { phone: string; code: string }) => Promise<User>;
+  /** Patients: mobile number + the password they set. */
+  passwordLogin: (credentials: { phone: string; password: string }) => Promise<User>;
+  /** Patients: save a new password. Afterwards the app is let through for the rest of this session. */
+  setPassword: (password: string) => Promise<void>;
+  /** True once a password was set since the last sign-in. In memory only: a reload asks again. */
+  passwordSet: boolean;
   logout: (reason?: EndReason) => Promise<void>;
   /** Asks again whether the email is verified, after the user clicked the link. */
   recheckVerification: () => Promise<User>;
@@ -34,6 +40,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [endReason, setEndReason] = useState<EndReason>(null);
   const [restoreError, setRestoreError] = useState<unknown>(null);
+  const [passwordSet, setPasswordSet] = useState(false);
 
   const signedIn = useCallback((next: User) => {
     setUser(next);
@@ -44,6 +51,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signedOut = useCallback(
     (reason: EndReason) => {
       setUser(null);
+      setPasswordSet(false);
       setEndReason(reason);
       setMonitoringUser(null);
       // Never let one user's cached health data be visible to the next person on this device
@@ -119,6 +127,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     async (attempt: () => Promise<User>) => {
       const previous = readLastActivity();
       writeLastActivity();
+      setPasswordSet(false);
       signingIn.current = true;
       try {
         const next = await attempt();
@@ -136,6 +145,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = useCallback((c: { email: string; password: string }) => signIn(() => authService.login(c)), [signIn]);
   const loginWithCode = useCallback((c: { phone: string; code: string }) => signIn(() => authService.loginWithCode(c)), [signIn]);
 
+  const passwordLogin = useCallback((c: { phone: string; password: string }) => signIn(() => authService.passwordLogin(c)), [signIn]);
+  const setPassword = useCallback(async (password: string) => {
+    await authService.setPassword(password);
+    setPasswordSet(true);
+  }, []);
+
   const logout = useCallback(
     async (reason: EndReason = null) => {
       await authService.logout().catch(() => {});
@@ -151,8 +166,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [signedIn]);
 
   const value = useMemo(
-    () => ({ user, loading, endReason, restoreError, retryRestore, login, loginWithCode, logout, recheckVerification }),
-    [user, loading, endReason, restoreError, retryRestore, login, loginWithCode, logout, recheckVerification]
+    () => ({ user, loading, endReason, restoreError, retryRestore, login, loginWithCode, passwordLogin, setPassword, passwordSet, logout, recheckVerification }),
+    [user, loading, endReason, restoreError, retryRestore, login, loginWithCode, passwordLogin, setPassword, passwordSet, logout, recheckVerification]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -34,6 +34,14 @@ export const authService = {
     await signInWithCustomToken(firebaseAuth, customToken);
     return meOrSignOut();
   },
+  /** Patients: phone + the password they set. They stay signed in on this phone. */
+  passwordLogin: async ({ phone, password }: { phone: string; password: string }) => {
+    const { customToken } = await api.post<{ customToken: string }>('/auth/password-login', { phone: normalizePhone(phone), password });
+    await signInWithCustomToken(firebaseAuth, customToken);
+    return meOrSignOut();
+  },
+  /** Patients, in a session that started from a login code. Sent exactly as typed (not trimmed). */
+  setPassword: (password: string) => api.put<{ hasPassword: true; passwordSetAt: string }>('/users/me/password', { password }),
   logout: () => signOut(firebaseAuth),
   getMe,
   /** After the user clicks the link: refresh Firebase's copy of the account and a fresh token, then ask the API again. */
@@ -62,6 +70,8 @@ const FIREBASE_ERRORS: Record<string, string> = {
 const API_ERRORS: Record<string, string> = {
   // The API gives one answer for a wrong, expired or used-up code.
   INVALID_LOGIN_CODE: 'That code is not right, or it has expired. Check it, or ask your doctor for a new one.',
+  INVALID_CREDENTIALS: 'Wrong number or password. After 5 wrong tries, wait 15 minutes or ask your doctor for a login code.',
+  LOGIN_CODE_SESSION_REQUIRED: 'Sign in with a login code from your doctor to set a new password.',
   RATE_LIMITED: 'Too many attempts. Please wait a few minutes and try again.',
 };
 

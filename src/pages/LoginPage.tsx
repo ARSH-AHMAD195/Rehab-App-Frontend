@@ -9,6 +9,7 @@ import { LanguageSwitch } from '../components/common/LanguageSwitch';
 import { cn } from '../lib/cn';
 import { Alert, Button, Field, Input } from '../components/ui';
 import { AuthShell } from '../components/common/AuthShell';
+import { PasswordSignIn } from '../components/auth/PasswordSignIn';
 import { CodeSignIn } from '../components/auth/CodeSignIn';
 import type { User } from '../types/api';
 
@@ -31,6 +32,7 @@ export const LoginPage = () => {
   const [audience, setAudience] = useState<Audience>('patient');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [withCode, setWithCode] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const patient = audience === 'patient';
@@ -94,7 +96,12 @@ export const LoginPage = () => {
       )}
 
       {patient ? (
-        <CodeSignIn />
+        <>
+          {withCode ? <CodeSignIn /> : <PasswordSignIn />}
+          <button type="button" className="mt-4 min-h-11 w-full text-sm font-semibold text-teal-800 hover:underline" onClick={() => setWithCode(!withCode)}>
+            {t(withCode ? 'Back to sign in with password' : 'First time, or forgot your password? Sign in with a code from your doctor')}
+          </button>
+        </>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           <Field label="Email address">
