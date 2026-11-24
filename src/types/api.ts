@@ -157,6 +157,8 @@ export interface MedicalProfile extends MedicalFields {
   age: number | null;
   bmi: number | null;
   daysToSurgery: number | null;
+  /** Doctors only: the API leaves it out entirely for the patient. Up to 2000 characters. */
+  clinicalNotes?: string | null;
   version: number;
   updatedAt: IsoDate | null;
   updatedBy: { id: Id; role: string } | null;

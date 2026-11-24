@@ -37,8 +37,6 @@ import type { MedicalProfile } from '../../types/api';
 const TAB_IDS = ['overview', 'vitals', 'investigations', 'nutrition', 'exercises', 'alerts'] as const;
 type TabKey = (typeof TAB_IDS)[number];
 // Doctor-entered vitals wait on a backend endpoint that isn't live yet
-const DOCTOR_VITALS = import.meta.env.VITE_DOCTOR_VITALS === 'true';
-
 const yesNo = (value: boolean | null | undefined) => (value === null || value === undefined ? null : value ? 'Yes' : 'No');
 
 const Detail = ({ label, children, className }: { label: string; children: ReactNode; className?: string }) => (
@@ -259,12 +257,10 @@ export const DoctorPatientDetailPage = () => {
             as="h3"
             description={today.data && `${today.data.filledCount} of ${today.data.totalCount} filled`}
             actions={
-              DOCTOR_VITALS && (
-                <Button size="sm" onClick={() => setModal('vitals')}>
-                  <Pencil className="h-4 w-4" aria-hidden="true" />
-                  Enter today’s vitals
-                </Button>
-              )
+              <Button size="sm" onClick={() => setModal('vitals')}>
+                <Pencil className="h-4 w-4" aria-hidden="true" />
+                Enter today’s vitals
+              </Button>
             }
           />
           {today.isPending ? (

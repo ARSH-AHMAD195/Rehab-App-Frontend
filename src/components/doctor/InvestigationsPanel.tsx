@@ -126,27 +126,57 @@ const AddResultModal = ({ patientId, test, onClose }: { patientId: string; test:
   );
 };
 
-/** Saves only the medications (one per line) from the card, instead of the whole medical details form. */
-const MedicationNotes = ({ patientId, medical }: { patientId: string; medical: MedicalProfile }) => {
+type NotesField = 'medications' | 'clinicalNotes';
+const NOTES: Record<NotesField, { title: string; label: string; hint: string; placeholder: string; maxLength?: number; saved: string; failed: string }> = {
+  medications: {
+    title: 'Medications',
+    label: 'Medications',
+    hint: 'One per line, up to 200 characters each',
+    placeholder: 'e.g. Metformin 500 mg twice daily',
+    saved: 'Medications saved.',
+    failed: 'Could not save the medications.',
+  },
+  clinicalNotes: {
+    title: 'Doctors’ notes',
+    label: 'Notes',
+    hint: 'Only doctors see these, never the patient. Up to 2000 characters.',
+    placeholder: 'e.g. Discussed stopping aspirin 5 days before surgery',
+    maxLength: 2000,
+    saved: 'Notes saved.',
+    failed: 'Could not save the notes.',
+  },
+};
+const notesText = (medical: MedicalProfile, field: NotesField) =>
+  field === 'medications' ? (medical.medications?.join('\n') ?? '') : (medical.clinicalNotes ?? '');
+/** Medications are one per line; notes are kept as typed, trimmed. */
+const notesValue = (text: string, field: NotesField) => {
+  if (field === 'clinicalNotes') return text.trim() || null;
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+  return lines.length ? lines : null;
+};
+const notesKey = (text: string, field: NotesField) => [notesValue(text, field)].flat().join('\n');
+
+/** Saves one field (the medications, or the doctors' notes) from its card, instead of the whole medical details form. */
+const NotesCard = ({ patientId, medical, field }: { patientId: string; medical: MedicalProfile; field: NotesField }) => {
+  const copy = NOTES[field];
   const toast = useToast();
   const queryClient = useQueryClient();
   const form = useFormErrors();
-  const saved = medical.medications?.join('\n') ?? '';
+  const saved = notesText(medical, field);
   const [text, setText] = useState(saved);
   const [base, setBase] = useState(saved);
-  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
-  // When the saved notes change (this save, or someone else's), show them, unless the doctor has unsaved typing
+  // When the saved text changes (this save, or someone else's), show it, unless the doctor has unsaved typing
   if (saved !== base) {
     if (text === base) setText(saved);
     setBase(saved);
   }
 
   const save = useMutation({
-    mutationFn: () => patientService.updateMedical(patientId, { version: medical.version, medications: lines.length ? lines : null }),
+    mutationFn: () => patientService.updateMedical(patientId, { version: medical.version, [field]: notesValue(text, field) }),
     onSuccess: (m) => {
-      toast.success('Medication notes saved.');
+      toast.success(copy.saved);
       // Show what was stored (trimmed, blank lines dropped), so the box isn't left "changed"
-      const stored = m.medications?.join('\n') ?? '';
+      const stored = notesText(m, field);
       setText(stored);
       setBase(stored);
       queryClient.setQueryData(qk.patientPart(patientId, 'medical'), m);
@@ -156,9 +186,9 @@ const MedicationNotes = ({ patientId, medical }: { patientId: string; medical: M
       if (err instanceof ApiError && err.code === 'CONCURRENT_UPDATE') {
         // Loads their version; the typed text stays, and saving again replaces theirs
         void queryClient.invalidateQueries({ queryKey: qk.patient(patientId) });
-        return form.setFormError('Someone else saved changes to this patient while you were typing. Your text is still in the box: Save again to replace their notes, or reload to see them.');
+        return form.setFormError('Someone else saved changes to this patient while you were typing. Your text is still in the box: Save again to replace theirs, or reload to see it.');
       }
-      form.fromApiError(err, 'Could not save the medication notes.');
+      form.fromApiError(err, copy.failed);
     },
   });
 
@@ -169,14 +199,14 @@ const MedicationNotes = ({ patientId, medical }: { patientId: string; medical: M
 
   return (
     <Card>
-      <SectionTitle title="Medication notes" as="h3" />
+      <SectionTitle title={copy.title} as="h3" />
       <form noValidate onSubmit={handleSubmit} onChange={form.onChange} className="space-y-3">
         {form.formError && <Alert tone="error">{form.formError}</Alert>}
-        <Field label="Medications and notes" hint="One per line, up to 200 characters each" error={form.errors.medications}>
-          <Textarea name="medications" rows={4} value={text} onChange={(e) => setText(e.target.value)} placeholder="e.g. Metformin 500 mg twice daily" />
+        <Field label={copy.label} hint={copy.hint} error={form.errors[field]}>
+          <Textarea name={field} rows={4} maxLength={copy.maxLength} value={text} onChange={(e) => setText(e.target.value)} placeholder={copy.placeholder} />
         </Field>
         <div className="flex justify-end">
-          <Button type="submit" size="sm" loading={save.isPending} disabled={lines.join('\n') === saved}>
+          <Button type="submit" size="sm" loading={save.isPending} disabled={notesKey(text, field) === notesKey(saved, field)}>
             Save
           </Button>
         </div>
@@ -284,7 +314,8 @@ export const InvestigationsPanel = ({ patientId, medical }: { patientId: string;
         </Card>
       ))}
 
-      {medical && <MedicationNotes patientId={patientId} medical={medical} />}
+      {medical && <NotesCard patientId={patientId} medical={medical} field="medications" />}
+      {medical && <NotesCard patientId={patientId} medical={medical} field="clinicalNotes" />}
 
       {adding && <AddResultModal patientId={patientId} test={adding} onClose={() => setAdding(null)} />}
       {retracting && (
