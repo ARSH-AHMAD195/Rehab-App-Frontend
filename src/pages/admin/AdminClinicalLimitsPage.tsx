@@ -6,6 +6,7 @@ import { useVitalTypes } from '../../lib/vitals';
 import { useFormErrors } from '../../lib/forms';
 import { toLimit, validateLimits, type LimitErrors } from '../../lib/clinicalLimits';
 import { GROUP_TITLES } from '../../lib/investigations';
+import { qk } from '../../lib/queryClient';
 import { formatDate, labelize } from '../../lib/format';
 import { Alert, Button, Card, ConfirmDialog, ErrorState, Field, Input, Modal, ModalActions, PageHeader, PageLoader, ScrollX, SectionTitle, Select } from '../../components/ui';
 import { useToast } from '../../components/ui/toast';
@@ -14,7 +15,7 @@ import type { AlertThreshold, InvestigationField, InvestigationGroup, Investigat
 type Severity = AlertThreshold['severity'];
 type BpField = 'systolic' | 'diastolic' | null;
 const thresholdsKey = ['admin', 'alertThresholds'] as const;
-const TESTS_KEY = ['investigationTests'] as const;
+const TESTS_KEY = qk.investigationTests;
 
 /** Global limits only (patientId null), following the cursor so no page is dropped. */
 const loadGlobalThresholds = async () => {

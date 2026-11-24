@@ -40,4 +40,6 @@ export const qk = {
   library: (params: object) => ['library', params] as const,
   doctors: ['admin', 'doctors'] as const,
   loginRequests: ['loginRequests'] as const,
+  investigationTests: ['investigationTests'] as const,
+  myInvestigations: ['my', 'investigations'] as const,
 };

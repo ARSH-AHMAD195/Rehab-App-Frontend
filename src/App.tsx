@@ -57,6 +57,7 @@ const routes: RouteObject[] = [
         { path: 'exercises', ...page(() => import('./pages/patient/PatientExercisesPage'), 'PatientExercisesPage') },
         { path: 'health-tracker', ...page(() => import('./pages/patient/PatientHealthTrackerPage'), 'PatientHealthTrackerPage') },
         { path: 'diet', ...page(() => import('./pages/patient/PatientDietPage'), 'PatientDietPage') },
+        { path: 'test-results', ...page(() => import('./pages/patient/PatientTestResultsPage'), 'PatientTestResultsPage') },
         { path: 'profile', ...page(() => import('./pages/patient/PatientProfilePage'), 'PatientProfilePage') },
       ]),
       roleArea('doctor', [

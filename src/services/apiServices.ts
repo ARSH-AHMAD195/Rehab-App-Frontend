@@ -149,6 +149,7 @@ export const clinicalService = {
   setRange: (data: { test: string; field: string; low: number | null; high: number | null }) => api.put<unknown>('/admin/investigation-ranges', data),
   getTests: () => api.get<{ data: InvestigationTest[] }>('/investigation-tests').then((r) => r.data),
   getInvestigations: (patientId: Id) => api.get<{ patientId: Id; tests: InvestigationGridRow[] }>(`/patients/${patientId}/investigations`).then((r) => r.tests),
+  getMyInvestigations: () => api.get<{ patientId: Id; tests: InvestigationGridRow[] }>('/patients/me/investigations').then((r) => r.tests),
   addInvestigation: (patientId: Id, data: { test: string; takenOn: string; values?: Record<string, number | string>; wnl?: boolean; comment?: string | null }) =>
     api.post<InvestigationResult>(`/patients/${patientId}/investigations`, data),
   /** Results are never deleted: a retracted one is kept with the reason and leaves the grid. */
