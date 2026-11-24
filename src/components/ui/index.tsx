@@ -139,6 +139,7 @@ export const ScrollX = ({ className, children, ...props }: ComponentProps<'div'>
     };
   }, []);
 
+  const scrolls = more.left || more.right;
   const arrow = (side: 'left' | 'right', Icon: LucideIcon) => (
     <div className={cn('pointer-events-none absolute inset-y-0 z-10 flex flex-col justify-center', side === 'left' ? 'left-1' : 'right-1')} aria-hidden="true">
       {/* Kept between the page header and the floating navbar */}
@@ -150,7 +151,13 @@ export const ScrollX = ({ className, children, ...props }: ComponentProps<'div'>
 
   return (
     <div className="relative">
-      <div ref={ref} className={cn('overflow-x-auto', className)} {...props}>
+      {/* When it scrolls, keyboard users need to focus it to scroll (axe scrollable-region-focusable); a caller's role (tablist) has its own focus */}
+      <div
+        ref={ref}
+        {...(scrolls && !props.role && { tabIndex: 0, role: 'region', 'aria-label': t('Scrollable table') })}
+        className={cn('overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600', className)}
+        {...props}
+      >
         {children}
       </div>
       {more.left && arrow('left', ChevronLeft)}

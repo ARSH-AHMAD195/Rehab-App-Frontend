@@ -57,6 +57,19 @@ describe('VitalsForm for a doctor', () => {
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['patient', 'p1', 'logs'] });
   });
 
+  it('shows the day as a short date, not the raw date key', async () => {
+    const source = doctorSource(() => Promise.resolve({ ...patientToday, alerts: [] }));
+    queryClient.setQueryData(qk.vitalTypes, [pulse]);
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ToastProvider>
+          <VitalsForm source={source} />
+        </ToastProvider>
+      </QueryClientProvider>
+    );
+    expect(await screen.findByText(/0 of 1 filled for 21 Nov\./)).toBeInTheDocument();
+  });
+
   it('reloads the patient’s day instead of closing when the day has changed', async () => {
     const source = doctorSource(() => Promise.reject(new ApiError(409, 'A new day has started', { code: 'DAY_CHANGED' })));
 

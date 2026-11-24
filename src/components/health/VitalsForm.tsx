@@ -5,6 +5,7 @@ import { vitalsService, type ReadingChanges } from '../../services/apiServices';
 import { ApiError } from '../../services/api';
 import { qk } from '../../lib/queryClient';
 import { useFormErrors } from '../../lib/forms';
+import { formatDate } from '../../lib/format';
 import { t } from '../../lib/i18n';
 import { useVitalLabel, useVitalTypes, vitalName } from '../../lib/vitals';
 import { Alert, Button, ErrorState, Field, Input, PageLoader, Textarea } from '../ui';
@@ -41,7 +42,7 @@ const changesBetween = (defs: VitalTypeDef[], before: Record<string, string>, af
 };
 
 const rangeHint = (def: VitalTypeDef) =>
-  def.valueKind === 'text' ? undefined : def.minValid !== undefined ? `${def.minValid}–${def.maxValid}${def.unit ? ` ${def.unit}` : ''}` : (def.unit ?? undefined);
+  def.valueKind === 'text' ? undefined : def.minValid !== undefined ? `${def.minValid}–${def.maxValid}${def.unit ? ` ${t(def.unit)}` : ''}` : def.unit ? t(def.unit) : undefined;
 
 type SavedLog = DailyLog & { alerts: SavedAlert[] };
 
@@ -135,7 +136,7 @@ export const VitalsForm = ({ onSaved, source = ownVitals }: { onSaved?: (log: Sa
       )}
       {form.formError && <Alert tone="error">{form.formError}</Alert>}
       <p className="text-sm text-slate-700">
-        {t('{filled} of {total} filled for {date}. Fill in what you have; you can come back later today.', { filled: today.data.filledCount, total: today.data.totalCount, date: today.data.date })}
+        {t('{filled} of {total} filled for {date}. Fill in what you have; you can come back later today.', { filled: today.data.filledCount, total: today.data.totalCount, date: formatDate(today.data.date, { day: 'numeric', month: 'short' }) })}
       </p>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -143,7 +144,7 @@ export const VitalsForm = ({ onSaved, source = ownVitals }: { onSaved?: (log: Sa
           def.valueKind === 'pair' ? (
             <fieldset key={def.type} className="grid grid-cols-2 gap-3 sm:col-span-2 lg:col-span-1">
               <legend className="mb-1 text-sm font-semibold text-slate-800">
-                {vitalName(def.type, def.label, def.labelHi)} ({def.unit})
+                {vitalName(def.type, def.label, def.labelHi)} ({def.unit && t(def.unit)})
               </legend>
               {input(def, `readings.${def.type}.systolic`, 'Top number')}
               {input(def, `readings.${def.type}.diastolic`, 'Bottom number')}

@@ -351,13 +351,13 @@ export const DoctorPatientDetailPage = () => {
           </Card>
 
           <Card>
-            <SectionTitle title="Last 7 days" as="h3" description={compliance.data && `${compliance.data.done} of ${compliance.data.planned} planned exercises done${compliance.data.skipped ? `, ${compliance.data.skipped} skipped` : ''}`} />
+            <SectionTitle title="Last 7 days, before today" as="h3" description={compliance.data && `${compliance.data.done} of ${compliance.data.planned} planned exercises done${compliance.data.skipped ? `, ${compliance.data.skipped} skipped` : ''}`} />
             {compliance.isPending ? (
               <PageLoader label="Loading…" />
             ) : compliance.isError ? (
               <Alert tone="error">{errorMessage(compliance.error)}</Alert>
             ) : compliance.data.byExercise.length === 0 ? (
-              <EmptyState>Nothing was planned in this period.</EmptyState>
+              <EmptyState>Nothing was planned in the 7 days before today.</EmptyState>
             ) : (
               <ul className="divide-y divide-slate-100 text-sm">
                 {compliance.data.byExercise.map((e) => (
@@ -395,7 +395,7 @@ export const DoctorPatientDetailPage = () => {
         ) : compliance.isError ? (
           <Alert tone="error">{errorMessage(compliance.error)}</Alert>
         ) : missedDays.length === 0 ? (
-          <EmptyState>{compliance.data.planned ? 'No missed exercises in the last 7 days.' : 'Nothing was planned in the last 7 days.'}</EmptyState>
+          <EmptyState>{compliance.data.planned ? 'No missed exercises in the 7 days before today.' : 'Nothing was planned in the 7 days before today.'}</EmptyState>
         ) : (
           <ul className="space-y-2 text-sm">
             {missedDays.map((d) => (

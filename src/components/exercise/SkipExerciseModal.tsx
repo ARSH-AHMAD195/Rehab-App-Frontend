@@ -17,14 +17,15 @@ export const SkipExerciseModal = ({ item, date, onClose }: { item: ChecklistItem
   const toast = useToast();
   const queryClient = useQueryClient();
   const form = useFormErrors();
-  const [reason, setReason] = useState<(typeof REASONS)[number]>('Too tired');
+  const [reason, setReason] = useState<(typeof REASONS)[number] | null>(null);
+  // Nothing pre-selected: the doctor reads this as the patient's real reason
   const [other, setOther] = useState('');
   // One key per attempt: a retry after a timeout never records the skip twice
   const [idempotencyKey] = useState(() => crypto.randomUUID());
 
   const skip = useMutation({
     mutationFn: () =>
-      completionService.complete({ itemId: item.itemId, date, status: 'SKIPPED', reason: reason === 'Other' ? other.trim() || 'Other' : reason }, idempotencyKey),
+      completionService.complete({ itemId: item.itemId, date, status: 'SKIPPED', reason: reason === 'Other' ? other.trim() || 'Other' : reason! }, idempotencyKey),
     onSuccess: () => {
       toast.success(t('"{name}" skipped for today. Your care team can see why.', { name: item.exercise.name }));
       void queryClient.invalidateQueries({ queryKey: ['my'] });
@@ -48,12 +49,12 @@ export const SkipExerciseModal = ({ item, date, onClose }: { item: ChecklistItem
     <Modal title="Couldn’t do it today?" description={item.exercise.name} onClose={onClose}>
       <form noValidate onSubmit={handleSubmit} onChange={form.onChange} className="space-y-4">
         {form.formError && <Alert tone="error">{form.formError}</Alert>}
-        <fieldset>
+        <fieldset aria-describedby={form.errors.reasonChoice ? 'skip-reason-error' : undefined}>
           <legend className="mb-2 text-sm font-semibold text-slate-800">{t('What got in the way?')}</legend>
           <div className="grid gap-2">
             {REASONS.map((r) => (
               <label key={r} className="cursor-pointer">
-                <input type="radio" name="reasonChoice" className="peer sr-only" checked={reason === r} onChange={() => setReason(r)} />
+                <input type="radio" name="reasonChoice" required className="peer sr-only" checked={reason === r} onChange={() => setReason(r)} />
                 <span
                   className={cn(
                     'flex min-h-11 items-center rounded-xl border-2 px-3 text-sm font-semibold',
@@ -66,6 +67,11 @@ export const SkipExerciseModal = ({ item, date, onClose }: { item: ChecklistItem
               </label>
             ))}
           </div>
+          {form.errors.reasonChoice && (
+            <p id="skip-reason-error" className="mt-1.5 text-sm text-rose-700">
+              {t('Please choose a reason.')}
+            </p>
+          )}
         </fieldset>
         {reason === 'Other' && (
           <Field label="Tell us briefly" error={form.errors.reason}>

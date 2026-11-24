@@ -27,7 +27,7 @@ const VitalTile = ({ label, reading }: { label: string; reading?: Reading }) => 
     {reading?.value ? (
       <p className="mt-1 text-2xl font-bold text-slate-900">
         {formatReading(reading.value)}
-        <span className="ml-1 text-sm font-normal text-slate-600">{reading.unit}</span>
+        <span className="ml-1 text-sm font-normal text-slate-600">{reading.unit && t(reading.unit)}</span>
       </p>
     ) : (
       <>
