@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { setLang } from '../../lib/i18n';
 import { PatientTestResultsPage } from './PatientTestResultsPage';
 
 const result = (id: string, takenOn: string, values: Record<string, number | string>, extra = {}) => ({
@@ -24,6 +25,7 @@ const renderPage = () =>
 
 beforeEach(() => {
   grid = [];
+  setLang('en');
 });
 
 describe('patient test results', () => {
@@ -54,5 +56,12 @@ describe('patient test results', () => {
     grid = [{ test: 'HB', label: 'Haemoglobin', group: 'HAEMATOLOGY', results: [] }];
     renderPage();
     expect(await screen.findByText('No test results yet. Your doctor adds them after your tests.')).toBeInTheDocument();
+  });
+
+  it('shows the group title in Hindi when Hindi is chosen', async () => {
+    grid = [{ test: 'HB', label: 'Haemoglobin', group: 'HAEMATOLOGY', results: [result('a', '2026-11-21', { value: 11 })] }];
+    setLang('hi');
+    renderPage();
+    expect(await screen.findByRole('heading', { name: 'रक्त की जाँच' })).toBeInTheDocument();
   });
 });

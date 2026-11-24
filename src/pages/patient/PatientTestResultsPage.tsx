@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { clinicalService } from '../../services/apiServices';
 import { formatDate } from '../../lib/format';
+import { qk } from '../../lib/queryClient';
 import { formatResult, GROUP_TITLES, testUnits } from '../../lib/investigations';
 import { t, useLang } from '../../lib/i18n';
 import { Card, ErrorState, PageHeader, PageLoader, SectionTitle } from '../../components/ui';
@@ -12,8 +13,8 @@ import type { InvestigationGroup } from '../../types/api';
  */
 export const PatientTestResultsPage = () => {
   useLang();
-  const tests = useQuery({ queryKey: ['investigationTests'], queryFn: clinicalService.getTests, staleTime: Infinity });
-  const grid = useQuery({ queryKey: ['myInvestigations'], queryFn: clinicalService.getMyInvestigations });
+  const tests = useQuery({ queryKey: qk.investigationTests, queryFn: clinicalService.getTests, staleTime: Infinity });
+  const grid = useQuery({ queryKey: qk.myInvestigations, queryFn: clinicalService.getMyInvestigations });
 
   if (tests.isPending || grid.isPending) return <PageLoader label={t('Loading your test results…')} />;
   if (tests.isError || grid.isError) {
@@ -32,7 +33,7 @@ export const PatientTestResultsPage = () => {
         if (inGroup.length === 0) return null;
         return (
           <Card key={group}>
-            <SectionTitle title={GROUP_TITLES[group]} as="h3" />
+            <SectionTitle title={t(GROUP_TITLES[group])} as="h3" />
             <ul className="divide-y divide-slate-100">
               {inGroup.map((row) => {
                 const test = byCode.get(row.test);

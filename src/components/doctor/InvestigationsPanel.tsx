@@ -246,7 +246,7 @@ export const InvestigationsPanel = ({ patientId, medical }: { patientId: string;
   const [retracting, setRetracting] = useState<InvestigationResult | null>(null);
   const [reason, setReason] = useState('');
 
-  const tests = useQuery({ queryKey: ['investigationTests'], queryFn: clinicalService.getTests, staleTime: Infinity });
+  const tests = useQuery({ queryKey: qk.investigationTests, queryFn: clinicalService.getTests, staleTime: Infinity });
   const grid = useQuery({ queryKey: qk.patientPart(patientId, 'investigations'), queryFn: () => clinicalService.getInvestigations(patientId) });
 
   const retract = useMutation({

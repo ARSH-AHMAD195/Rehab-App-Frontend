@@ -194,6 +194,10 @@ export const hi: Record<string, string> = {
   'Diet Chart': 'आहार चार्ट',
   Diet: 'आहार',
   'High-calorie, High-protein Diet for Cancer Patients': 'कैंसर मरीज़ों के लिए उच्च कैलोरी, उच्च प्रोटीन आहार',
+  Haematology: 'रक्त की जाँच',
+  Biochemistry: 'बायोकेमिस्ट्री',
+  'Cardiac, respiratory and imaging': 'दिल, साँस और इमेजिंग',
+  'Nutrition score': 'पोषण स्कोर',
   'High-calorie, high-protein diet': 'उच्च कैलोरी, उच्च प्रोटीन आहार',
   'About {kcal} kcal and {protein} g protein a day': 'रोज़ लगभग {kcal} किलो कैलोरी और {protein} ग्राम प्रोटीन',
   'If your care team has given you a different diet, follow their advice. Calories and protein are approximate, for the whole meal.':
