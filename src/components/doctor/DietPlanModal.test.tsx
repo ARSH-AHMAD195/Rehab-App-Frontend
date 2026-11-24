@@ -258,6 +258,21 @@ describe('diet plan modal: food reference', () => {
     expect(quantity).toHaveValue('2 bowls');
   });
 
+  it('replaces the serving it filled when the food changes, but keeps one the doctor edited', async () => {
+    const user = userEvent.setup();
+    const { food, quantity } = await openLunch(user);
+    fireEvent.change(food, { target: { value: 'Idli' } });
+    expect(quantity).toHaveValue('2 pieces');
+    fireEvent.change(food, { target: { value: 'Upma' } });
+    expect(quantity).toHaveValue('1 katori (150 g)');
+    fireEvent.change(food, { target: { value: 'Upma with veg' } });
+    expect(quantity).toHaveValue('');
+    fireEvent.change(food, { target: { value: 'Idli' } });
+    fireEvent.change(quantity, { target: { value: '3 pieces' } });
+    fireEvent.change(food, { target: { value: 'Upma' } });
+    expect(quantity).toHaveValue('3 pieces');
+  });
+
   it('saves only what the doctor entered', async () => {
     const user = userEvent.setup();
     const { food } = await openLunch(user);
