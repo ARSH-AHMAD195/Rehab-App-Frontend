@@ -242,8 +242,9 @@ export const DietPlanModal = ({ patientId, plan, onClose }: { patientId: string;
                                   updateOption(i, k, {
                                     en: e.target.value,
                                     hi: '',
-                                    // A reference food fills an empty quantity; a typed one is never overwritten
-                                    ...(!o.quantity.trim() && { quantity: findFood(e.target.value)?.serving ?? '' }),
+                                    // A reference food fills an empty quantity, or replaces the serving it filled for the previous
+                                    // food; a quantity the doctor typed is never overwritten
+                                    ...((!o.quantity.trim() || o.quantity === ref?.serving) && { quantity: findFood(e.target.value)?.serving ?? '' }),
                                   })
                                 }
                               />
