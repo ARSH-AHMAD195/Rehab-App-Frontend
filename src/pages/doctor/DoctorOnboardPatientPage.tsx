@@ -58,7 +58,8 @@ export const DoctorOnboardPatientPage = () => {
       const patient = await patientService.register({
         name: account.name.trim(),
         phone: normalizePhone(account.phone),
-        email: account.email.trim() || null,
+        // Left out when blank: the API refuses email: null
+        email: account.email.trim() || undefined,
         timeZone: account.timeZone.trim() || DEFAULT_TIME_ZONE,
       });
       const fields = Object.fromEntries(Object.entries(formToMedical(medical)).filter(([, v]) => v !== null));

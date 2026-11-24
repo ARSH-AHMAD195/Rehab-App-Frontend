@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Plus, Printer, X } from 'lucide-react';
 import { clinicalService, patientService } from '../../services/apiServices';
 import { ApiError, errorMessage } from '../../services/api';
 import { useFormErrors } from '../../lib/forms';
@@ -8,7 +9,7 @@ import { cn } from '../../lib/cn';
 import { dateKeyIn, formatDate, labelize } from '../../lib/format';
 import { formatResult, GROUP_TITLES, testUnits } from '../../lib/investigations';
 import { qk } from '../../lib/queryClient';
-import { Alert, Button, Card, ConfirmDialog, Field, Input, Modal, ModalActions, PageLoader, SectionTitle, Select, Textarea } from '../ui';
+import { Alert, Button, buttonClass, Card, ConfirmDialog, Field, Input, Modal, ModalActions, PageLoader, SectionTitle, Select, Textarea } from '../ui';
 import { useToast } from '../ui/toast';
 import type { InvestigationField, InvestigationGroup, InvestigationResult, InvestigationTest, MedicalProfile } from '../../types/api';
 
@@ -236,6 +237,13 @@ export const InvestigationsPanel = ({ patientId, medical }: { patientId: string;
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <Link to={`/doctor/patient/${patientId}/reports/investigations`} target="_blank" rel="noopener" className={buttonClass('secondary', 'sm')}>
+          <Printer className="h-4 w-4" aria-hidden="true" />
+          Investigation report
+          <span className="sr-only"> (opens in a new tab)</span>
+        </Link>
+      </div>
       {groups.map((group) => (
         <Card key={group}>
           <SectionTitle title={GROUP_TITLES[group]} as="h3" />

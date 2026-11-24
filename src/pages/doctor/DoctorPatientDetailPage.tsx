@@ -16,6 +16,7 @@ import { panelId, tabId, Tabs } from '../../components/ui/Tabs';
 import { useToast } from '../../components/ui/toast';
 import { VitalTrend } from '../../components/health/VitalTrend';
 import { LogsTable } from '../../components/health/LogsTable';
+import { VitalsForm } from '../../components/health/VitalsForm';
 import { AlertSummary } from '../../components/doctor/AlertSummary';
 import { MedicalFieldsInputs } from '../../components/doctor/MedicalFieldsInputs';
 import { PlanEditorModal } from '../../components/doctor/PlanEditorModal';
@@ -35,6 +36,8 @@ import type { MedicalProfile } from '../../types/api';
 
 const TAB_IDS = ['overview', 'vitals', 'investigations', 'nutrition', 'exercises', 'alerts'] as const;
 type TabKey = (typeof TAB_IDS)[number];
+// Doctor-entered vitals wait on a backend endpoint that isn't live yet
+const DOCTOR_VITALS = import.meta.env.VITE_DOCTOR_VITALS === 'true';
 
 const yesNo = (value: boolean | null | undefined) => (value === null || value === undefined ? null : value ? 'Yes' : 'No');
 
@@ -115,7 +118,7 @@ export const DoctorPatientDetailPage = () => {
   const toast = useToast();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [modal, setModal] = useState<'plan' | 'medical' | 'diet' | null>(null);
+  const [modal, setModal] = useState<'plan' | 'medical' | 'diet' | 'vitals' | null>(null);
   const vitalLabel = useVitalLabel();
 
   // The active tab lives in the URL so it survives reloads and works with Back
@@ -251,7 +254,19 @@ export const DoctorPatientDetailPage = () => {
     vitals: (
       <div className="space-y-6">
         <Card>
-          <SectionTitle title={`Today${today.data ? ` (${today.data.date})` : ''}`} as="h3" description={today.data && `${today.data.filledCount} of ${today.data.totalCount} filled`} />
+          <SectionTitle
+            title={`Today${today.data ? ` (${today.data.date})` : ''}`}
+            as="h3"
+            description={today.data && `${today.data.filledCount} of ${today.data.totalCount} filled`}
+            actions={
+              DOCTOR_VITALS && (
+                <Button size="sm" onClick={() => setModal('vitals')}>
+                  <Pencil className="h-4 w-4" aria-hidden="true" />
+                  Enter today’s vitals
+                </Button>
+              )
+            }
+          />
           {today.isPending ? (
             <PageLoader label="Loading today’s readings…" />
           ) : today.isError ? (
@@ -490,6 +505,24 @@ export const DoctorPatientDetailPage = () => {
       {modal === 'plan' && plan.data && <PlanEditorModal patientId={patientId} plan={plan.data} onClose={() => setModal(null)} />}
       {modal === 'medical' && <EditMedicalModal patientId={patientId} onClose={() => setModal(null)} />}
       {modal === 'diet' && dietPlan.data && <DietPlanModal patientId={patientId} plan={dietPlan.data} onClose={() => setModal(null)} />}
+      {modal === 'vitals' && (
+        <Modal title="Enter today’s vitals" description={`For ${p.name}`} onClose={() => setModal(null)} size="xl">
+          <VitalsForm
+            source={{
+              // Same entry as the Today card's, so the form saves for the date the doctor sees
+              todayKey: qk.patientPart(patientId, 'today'),
+              loadToday: () => vitalsService.getPatientToday(patientId),
+              save: (date, readings) => vitalsService.savePatientToday(patientId, date, readings),
+              invalidate: [qk.patientPart(patientId, 'today'), qk.patientPart(patientId, 'logs'), qk.patientPart(patientId, 'vitals'), qk.patientPart(patientId, 'triage'), ['alerts']],
+            }}
+            onSaved={(log) => {
+              // The form toasts a plain save itself; with alerts it shows them inline, which closing would hide
+              if (log.alerts.length) toast.info(`Saved. ${log.alerts.length === 1 ? '1 reading' : `${log.alerts.length} readings`} raised an alert.`);
+              setModal(null);
+            }}
+          />
+        </Modal>
+      )}
     </div>
   );
 };

@@ -57,7 +57,7 @@ export const profileService = {
 
 export const patientService = {
   /** Doctor: linked patients only (their own id is linked automatically). Admin: doctorIds required. */
-  register: (data: { name: string; phone: string; email?: string | null; timeZone?: string; doctorIds?: Id[] }) =>
+  register: (data: { name: string; phone: string; email?: string; timeZone?: string; doctorIds?: Id[] }) =>
     api.post<Patient & { invitation: InvitationStatus }>('/patients', data),
   /** Doctor: `scope` all (default) or only patients linked to them. */
   list: (params: ListParams & { doctorId?: Id; scope?: PatientScope } = {}) => api.get<Page<Patient>>('/patients', params),
@@ -116,6 +116,9 @@ export const vitalsService = {
   getPatientLogs: (patientId: Id, params: Range & Paged = {}) => api.get<Page<DailyLog>>(`/doctor/patients/${patientId}/vitals/logs`, params),
   getPatientTrend: (patientId: Id, type: VitalType, period: TrendPeriod) =>
     api.get<Trend>(`/doctor/patients/${patientId}/vitals/trends`, { type, period }),
+  /** Draft endpoint, not live yet (VITE_DOCTOR_VITALS). Same body, errors and response as saveToday; `date` is the patient's today. */
+  savePatientToday: (patientId: Id, date: string, readings: ReadingChanges, idempotencyKey: string = crypto.randomUUID()) =>
+    api.put<DailyLog & { alerts: SavedAlert[] }>(`/doctor/patients/${patientId}/vitals/today`, { date, readings }, idempotencyKey),
 };
 
 export const alertService = {
