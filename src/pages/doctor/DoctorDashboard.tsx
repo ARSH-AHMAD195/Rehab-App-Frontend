@@ -240,6 +240,7 @@ export const DoctorDashboard = () => {
                   <p className="mt-1 text-sm text-slate-700">{p.email}</p>
                   <p className="mt-1 text-xs text-slate-600">
                     Enrolled {formatDate(p.createdAt)}
+                    {!p.emailVerified && ' · hasn’t signed in yet'}
                   </p>
                 </div>
                 <Link to={`/doctor/patient/${p.id}`} className="mt-4 inline-flex items-center gap-1 self-end text-sm font-semibold text-teal-800 hover:underline">
