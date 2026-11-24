@@ -34,6 +34,31 @@ export const authService = {
     await signInWithCustomToken(firebaseAuth, customToken);
     return meOrSignOut();
   },
+  /** Patients: phone + the password they set. They stay signed in on this phone. */
+  passwordLogin: async ({ phone, password }: { phone: string; password: string }) => {
+    const { customToken } = await api.post<{ customToken: string }>('/auth/password-login', { phone: normalizePhone(phone), password });
+    await signInWithCustomToken(firebaseAuth, customToken);
+    return meOrSignOut();
+  },
+  /** Patients, in a session that started from a login code. Sent exactly as typed (not trimmed). */
+  setPassword: async (password: string) => {
+    await api.put<{ hasPassword: true; passwordSetAt: string }>('/users/me/password', { password });
+    try {
+      const mark = signInMark();
+      if (mark) localStorage.setItem(PASSWORD_SET_KEY, mark);
+    } catch {
+      // Storage blocked: they'll be asked again after a reload, which is harmless
+    }
+  },
+  /** Whether a password was set during this sign-in, also after the app is closed and reopened. */
+  passwordSetThisSignIn: () => {
+    try {
+      const mark = signInMark();
+      return Boolean(mark) && localStorage.getItem(PASSWORD_SET_KEY) === mark;
+    } catch {
+      return false;
+    }
+  },
   logout: () => signOut(firebaseAuth),
   getMe,
   /** After the user clicks the link: refresh Firebase's copy of the account and a fresh token, then ask the API again. */
@@ -59,9 +84,21 @@ const FIREBASE_ERRORS: Record<string, string> = {
   'auth/network-request-failed': 'Unable to reach the server. Check your connection and try again.',
 };
 
+/**
+ * Patients stay signed in for weeks, so "password already set" must outlive a reload of a code-started session.
+ * The mark names this one Firebase sign-in (user + its sign-in time): no secret, and a new code sign-in has a new time.
+ */
+const PASSWORD_SET_KEY = 'ffs.passwordSetFor';
+const signInMark = () => {
+  const u = firebaseAuth.currentUser;
+  return u?.metadata.lastSignInTime ? `${u.uid}|${u.metadata.lastSignInTime}` : null;
+};
+
 const API_ERRORS: Record<string, string> = {
   // The API gives one answer for a wrong, expired or used-up code.
   INVALID_LOGIN_CODE: 'That code is not right, or it has expired. Check it, or ask your doctor for a new one.',
+  INVALID_CREDENTIALS: 'Wrong number or password. After 5 wrong tries, wait 15 minutes or ask your doctor for a login code.',
+  LOGIN_CODE_SESSION_REQUIRED: 'Sign in with a login code from your doctor to set a new password.',
   RATE_LIMITED: 'Too many attempts. Please wait a few minutes and try again.',
 };
 

@@ -21,10 +21,10 @@ export const writeLastActivity = (now = Date.now()) => {
 };
 
 /**
- * Staff and email sign-ins are signed out when idle. Code sign-in patients are not: they're on their own
- * phone, and every new code needs their doctor. They can still sign out themselves.
+ * Staff are signed out when idle. Patients are not, however they signed in: they're on their own phone,
+ * and getting back in needs a password or a code from their doctor. They can still sign out themselves.
  */
-export const idleSignOutApplies = (user: { loginMethod: 'PASSWORD' | 'LOGIN_CODE' }) => user.loginMethod !== 'LOGIN_CODE';
+export const idleSignOutApplies = (user: { role: string }) => user.role !== 'patient';
 
 /** True when a saved session has sat unused for too long. No record means nothing to judge by. */
 export const idleExpired = (now = Date.now()) => {

@@ -2,9 +2,10 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { IDLE_MS, idleExpired, idleSignOutApplies, writeLastActivity } from './idle';
 
 describe('idleSignOutApplies', () => {
-  it('signs out email sign-ins but keeps code sign-in patients signed in', () => {
-    expect(idleSignOutApplies({ loginMethod: 'PASSWORD' })).toBe(true);
-    expect(idleSignOutApplies({ loginMethod: 'LOGIN_CODE' })).toBe(false);
+  it('signs out staff but keeps patients signed in, whichever way they signed in', () => {
+    expect(idleSignOutApplies({ role: 'doctor' })).toBe(true);
+    expect(idleSignOutApplies({ role: 'admin' })).toBe(true);
+    expect(idleSignOutApplies({ role: 'patient' })).toBe(false);
   });
 });
 
