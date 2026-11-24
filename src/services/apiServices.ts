@@ -44,7 +44,8 @@ export { authService } from './authService';
 type ListParams = { q?: string; active?: 'true' | 'false' | 'all'; limit?: number; cursor?: string };
 type Range = { from?: string; to?: string };
 type Paged = { limit?: number; cursor?: string };
-export type MedicalUpdate = Partial<MedicalFields> & { version: number };
+/** clinicalNotes: doctors only (a patient sending it gets 403). */
+export type MedicalUpdate = Partial<MedicalFields> & { clinicalNotes?: string | null; version: number };
 
 // ---------- Auth API ----------
 
@@ -118,7 +119,7 @@ export const vitalsService = {
   getPatientLogs: (patientId: Id, params: Range & Paged = {}) => api.get<Page<DailyLog>>(`/doctor/patients/${patientId}/vitals/logs`, params),
   getPatientTrend: (patientId: Id, type: VitalType, period: TrendPeriod) =>
     api.get<Trend>(`/doctor/patients/${patientId}/vitals/trends`, { type, period }),
-  /** Draft endpoint, not live yet (VITE_DOCTOR_VITALS). Same body, errors and response as saveToday; `date` is the patient's today. */
+  /** Same body, errors and response as saveToday; `date` is the patient's today. */
   savePatientToday: (patientId: Id, date: string, readings: ReadingChanges, idempotencyKey: string = crypto.randomUUID()) =>
     api.put<DailyLog & { alerts: SavedAlert[] }>(`/doctor/patients/${patientId}/vitals/today`, { date, readings }, idempotencyKey),
 };

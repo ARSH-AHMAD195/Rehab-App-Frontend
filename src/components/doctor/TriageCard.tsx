@@ -34,7 +34,10 @@ const Reasons = ({ title, items, className }: { title: string; items: Triage['re
       <p className={`text-xs font-bold uppercase ${className}`}>{title}</p>
       <ul className="mt-1 list-inside list-disc text-sm text-slate-800">
         {items.map((r) => (
-          <li key={r.parameter}>{r.explanation}</li>
+          <li key={r.parameter}>
+            {r.explanation}
+            {r.date && <span className="text-slate-600"> · {formatDate(r.date)}</span>}
+          </li>
         ))}
       </ul>
     </div>
