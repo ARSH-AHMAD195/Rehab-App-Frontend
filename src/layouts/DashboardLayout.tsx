@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Activity, Dumbbell, Gauge, Heart, KeyRound, LogOut, Stethoscope, UserCircle, UserPlus, Users, Utensils, type LucideIcon } from 'lucide-react';
+import { Activity, Dumbbell, FlaskConical, Gauge, Heart, KeyRound, LogOut, Stethoscope, UserCircle, UserPlus, Users, Utensils, type LucideIcon } from 'lucide-react';
 import { useSignedInUser, useAuth } from '../context/AuthContext';
 import { MedicalDisclaimer } from '../components/common/MedicalDisclaimer';
 import { ErrorBoundary } from '../components/ErrorBoundary';
@@ -24,6 +24,7 @@ const NAV: Record<Role, NavItem[]> = {
     { label: 'My Exercises', short: 'Exercises', to: '/patient/exercises', icon: Dumbbell },
     { label: 'Health Tracker', short: 'Vitals', to: '/patient/health-tracker', icon: Heart },
     { label: 'Diet Chart', short: 'Diet', to: '/patient/diet', icon: Utensils },
+    { label: 'Test results', short: 'Results', to: '/patient/test-results', icon: FlaskConical },
     { label: 'My Profile', short: 'Me', to: '/patient/profile', icon: UserCircle },
   ],
   doctor: [

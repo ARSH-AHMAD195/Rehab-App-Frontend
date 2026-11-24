@@ -183,6 +183,13 @@ export const hi: Record<string, string> = {
   'vital:WATER_ML': 'पानी',
   'vital:MOOD': 'मनोदशा',
 
+  // Test results
+  'Test results': 'जाँच के नतीजे',
+  Results: 'नतीजे',
+  'Your test results, newest first. Ask your care team what they mean.': 'आपकी जाँच के नतीजे, सबसे नए पहले। इनका मतलब अपनी देखभाल टीम से पूछें।',
+  'No test results yet. Your doctor adds them after your tests.': 'अभी कोई जाँच नतीजा नहीं है। आपके टेस्ट के बाद डॉक्टर इन्हें जोड़ते हैं।',
+  'Loading your test results…': 'आपके जाँच के नतीजे लोड हो रहे हैं…',
+
   // Diet chart
   'Diet Chart': 'आहार चार्ट',
   Diet: 'आहार',
