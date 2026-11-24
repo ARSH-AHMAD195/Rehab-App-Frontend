@@ -149,6 +149,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const passwordLogin = useCallback((c: { phone: string; password: string }) => signIn(() => authService.passwordLogin(c)), [signIn]);
   const setPassword = useCallback(async (password: string) => {
     await authService.setPassword(password);
+    setUser((u) => u && { ...u, hasPassword: true });
     setPasswordSet(true);
   }, []);
 
