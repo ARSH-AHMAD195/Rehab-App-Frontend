@@ -25,7 +25,7 @@ interface AuthValue {
   passwordLogin: (credentials: { phone: string; password: string }) => Promise<User>;
   /** Patients: save a new password. Afterwards the app is let through for the rest of this session. */
   setPassword: (password: string) => Promise<void>;
-  /** True once a password was set since the last sign-in. In memory only: a reload asks again. */
+  /** True once a password was set during the current sign-in (kept across reloads of that sign-in). */
   passwordSet: boolean;
   logout: (reason?: EndReason) => Promise<void>;
   /** Asks again whether the email is verified, after the user clicked the link. */
@@ -44,6 +44,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signedIn = useCallback((next: User) => {
     setUser(next);
+    setPasswordSet(authService.passwordSetThisSignIn());
     setMonitoringUser(next);
     setEndReason(null);
   }, []);

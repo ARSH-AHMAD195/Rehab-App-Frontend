@@ -41,7 +41,24 @@ export const authService = {
     return meOrSignOut();
   },
   /** Patients, in a session that started from a login code. Sent exactly as typed (not trimmed). */
-  setPassword: (password: string) => api.put<{ hasPassword: true; passwordSetAt: string }>('/users/me/password', { password }),
+  setPassword: async (password: string) => {
+    await api.put<{ hasPassword: true; passwordSetAt: string }>('/users/me/password', { password });
+    try {
+      const mark = signInMark();
+      if (mark) localStorage.setItem(PASSWORD_SET_KEY, mark);
+    } catch {
+      // Storage blocked: they'll be asked again after a reload, which is harmless
+    }
+  },
+  /** Whether a password was set during this sign-in, also after the app is closed and reopened. */
+  passwordSetThisSignIn: () => {
+    try {
+      const mark = signInMark();
+      return Boolean(mark) && localStorage.getItem(PASSWORD_SET_KEY) === mark;
+    } catch {
+      return false;
+    }
+  },
   logout: () => signOut(firebaseAuth),
   getMe,
   /** After the user clicks the link: refresh Firebase's copy of the account and a fresh token, then ask the API again. */
@@ -65,6 +82,16 @@ const FIREBASE_ERRORS: Record<string, string> = {
   'auth/user-disabled': 'This account has been deactivated. Please contact your care team.',
   'auth/too-many-requests': 'Too many attempts. Please wait a few minutes and try again.',
   'auth/network-request-failed': 'Unable to reach the server. Check your connection and try again.',
+};
+
+/**
+ * Patients stay signed in for weeks, so "password already set" must outlive a reload of a code-started session.
+ * The mark names this one Firebase sign-in (user + its sign-in time): no secret, and a new code sign-in has a new time.
+ */
+const PASSWORD_SET_KEY = 'ffs.passwordSetFor';
+const signInMark = () => {
+  const u = firebaseAuth.currentUser;
+  return u?.metadata.lastSignInTime ? `${u.uid}|${u.metadata.lastSignInTime}` : null;
 };
 
 const API_ERRORS: Record<string, string> = {

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -10,7 +10,10 @@ import { ToastProvider } from '../components/ui/toast';
 import { api, ApiError } from '../services/api';
 import { ProtectedRoute } from './ProtectedRoute';
 
-const { signInWithCustomToken } = vi.hoisted(() => ({ signInWithCustomToken: vi.fn() }));
+const { signInWithCustomToken, fakeAuth } = vi.hoisted(() => ({
+  signInWithCustomToken: vi.fn(),
+  fakeAuth: { currentUser: null as null | { uid: string; metadata: { lastSignInTime?: string } } },
+}));
 vi.mock('firebase/auth', () => ({
   signInWithCustomToken,
   signInWithEmailAndPassword: vi.fn(),
@@ -22,7 +25,7 @@ vi.mock('firebase/auth', () => ({
     return () => {};
   },
 }));
-vi.mock('../lib/firebase', () => ({ firebaseAuth: { currentUser: null } }));
+vi.mock('../lib/firebase', () => ({ firebaseAuth: fakeAuth }));
 
 const me = (over: Record<string, unknown>) => ({ id: 'u1', role: 'PATIENT', name: 'Asha', email: null, emailVerified: false, active: true, loginMethod: 'LOGIN_CODE', hasPassword: false, ...over });
 
@@ -32,6 +35,8 @@ const get = vi.spyOn(api, 'get');
 
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.clear();
+  fakeAuth.currentUser = { uid: 'fb1', metadata: { lastSignInTime: 'Mon, 23 Nov 2026 10:00:00 GMT' } };
   signInWithCustomToken.mockReset();
   post.mockResolvedValue({ customToken: 'tok-1' });
   put.mockResolvedValue({ hasPassword: true });
@@ -147,6 +152,26 @@ describe('set-password gate', () => {
     await user.click(screen.getByRole('button', { name: 'Save password' }));
     await waitFor(() => expect(put).toHaveBeenCalledWith('/users/me/password', { password: ' pass word ' }));
     expect(await screen.findByText('APP HOME')).toBeInTheDocument();
+  });
+
+  it('is not asked again when the app is reopened in the same sign-in, but is after a new code sign-in', async () => {
+    await renderGate({}, 'code');
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('New password'), 'secret1');
+    await user.type(screen.getByLabelText('Type it again'), 'secret1');
+    await user.click(screen.getByRole('button', { name: 'Save password' }));
+    expect(await screen.findByText('APP HOME')).toBeInTheDocument();
+    cleanup();
+
+    // Reopened: same Firebase sign-in, still a code session
+    await renderGate({ hasPassword: true }, 'code');
+    expect(await screen.findByText('APP HOME')).toBeInTheDocument();
+    cleanup();
+
+    // A new code sign-in (forgot the password): asked again
+    fakeAuth.currentUser = { uid: 'fb1', metadata: { lastSignInTime: 'Tue, 24 Nov 2026 09:00:00 GMT' } };
+    await renderGate({ hasPassword: true }, 'code');
+    expect(await screen.findByRole('heading', { name: 'Set a new password' })).toBeInTheDocument();
   });
 
   it('says "Set a new password" when one already exists', async () => {
