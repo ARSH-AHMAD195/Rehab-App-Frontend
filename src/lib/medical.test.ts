@@ -15,6 +15,12 @@ describe('medical form', () => {
     expect(medicalChanges(before, formToMedical({ ...EMPTY_MEDICAL_FORM, heightCm: '170' }))).toEqual({});
   });
 
+  it('treats a stored +91 emergency number as unchanged when the form shows its 10 digits', () => {
+    const before = { emergencyContact: { name: 'Asha', relation: 'Wife', phone: '+919812345678' } } as MedicalProfile;
+    const after = formToMedical(medicalToForm(before));
+    expect(medicalChanges(before, after)).not.toHaveProperty('emergencyContact');
+  });
+
   it('works out BMI once height and weight are both known', () => {
     expect(bmi(170, 70)).toBe(24.2);
     expect(bmi(null, 70)).toBeNull();

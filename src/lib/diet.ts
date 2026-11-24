@@ -14,16 +14,21 @@ export const newCode = (label: string, taken: Iterable<string>) => {
 };
 
 /** Form rows: numbers as typed, and an empty code for anything added here (made on save).
- * Hindi isn't edited here: saved Hindi goes back unchanged, and the form clears it when the English is renamed. */
-export type OptionRow = { code: string; en: string; hi: string; quantity: string };
-export type SlotRow = { code: string; en: string; hi: string; from: string; to: string; kcal: string; protein: string; options: OptionRow[] };
+ * Hindi isn't edited here: saved Hindi goes back unchanged, and the form clears it when the English is renamed.
 
-export const EMPTY_OPTION: OptionRow = { code: '', en: '', hi: '', quantity: '' };
+* `key` is for React only, so a removed row doesn't hand its inputs to the next one. */
+export type OptionRow = { key?: number; code: string; en: string; hi: string; quantity: string };
+export type SlotRow = { key?: number; code: string; en: string; hi: string; from: string; to: string; kcal: string; protein: string; options: OptionRow[] };
+
+let lastKey = 0;
+export const nextKey = () => ++lastKey;
+export const emptyOption = (): OptionRow => ({ key: nextKey(), code: '', en: '', hi: '', quantity: '' });
 
 export const toRows = (slots: MealSlot[]): SlotRow[] =>
   slots.map((s) => {
     const [from = '', to = ''] = s.window.split('-');
     return {
+      key: nextKey(),
       code: s.code,
       en: s.label.en,
       hi: s.label.hi ?? '',
@@ -31,7 +36,7 @@ export const toRows = (slots: MealSlot[]): SlotRow[] =>
       to,
       kcal: String(s.kcal),
       protein: String(s.proteinG),
-      options: s.options.map((o) => ({ code: o.code, en: o.label.en, hi: o.label.hi ?? '', quantity: o.quantity })),
+      options: s.options.map((o) => ({ key: nextKey(), code: o.code, en: o.label.en, hi: o.label.hi ?? '', quantity: o.quantity })),
     };
   });
 

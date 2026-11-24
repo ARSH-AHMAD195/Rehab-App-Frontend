@@ -80,23 +80,15 @@ const routes: RouteObject[] = [
   },
 ];
 
-const ROUTER_FUTURE = {
-  v7_relativeSplatPath: true,
-  v7_fetcherPersist: true,
-  v7_normalizeFormMethod: true,
-  v7_partialHydration: true,
-  v7_skipActionErrorRevalidation: true,
-} as const;
-
 export default function App() {
   // Created on mount (not at import) so it starts from the current URL, which tests rely on.
-  const [router] = useState(() => createBrowserRouter(routes, { future: ROUTER_FUTURE }));
+  const [router] = useState(() => createBrowserRouter(routes));
 
   return (
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <AuthProvider>
-          <RouterProvider router={router} future={{ v7_startTransition: true }} />
+          <RouterProvider router={router} />
         </AuthProvider>
       </ToastProvider>
     </QueryClientProvider>

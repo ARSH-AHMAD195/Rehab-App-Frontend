@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { IDLE_MS, idleExpired, writeLastActivity } from './idle';
+import { IDLE_MS, idleExpired, idleSignOutApplies, writeLastActivity } from './idle';
+
+describe('idleSignOutApplies', () => {
+  it('signs out email sign-ins but keeps code sign-in patients signed in', () => {
+    expect(idleSignOutApplies({ loginMethod: 'PASSWORD' })).toBe(true);
+    expect(idleSignOutApplies({ loginMethod: 'LOGIN_CODE' })).toBe(false);
+  });
+});
 
 describe('idleExpired', () => {
   beforeEach(() => localStorage.clear());

@@ -5,6 +5,7 @@ import { nutritionService } from '../../services/apiServices';
 import { errorMessage } from '../../services/api';
 import { formatDateTime } from '../../lib/format';
 import { qk } from '../../lib/queryClient';
+import { usePatientDietPlan } from '../../lib/hooks';
 import { Alert, buttonClass, Card, PageLoader, SectionTitle } from '../ui';
 import { IntakeBars, MealHistory, MealSlots } from '../health/MealDay';
 import { percentText, round1 } from '../../lib/reports';
@@ -41,7 +42,7 @@ const DayDetail = ({ day, today }: { day: MealHistoryDay; today: MealDay }) => (
 
 /** The patient's diet chart: today's ticks, the last week, and their targets. Every read is audited. */
 export const NutritionPanel = ({ patientId }: { patientId: string }) => {
-  const plan = useQuery({ queryKey: qk.patientPart(patientId, 'nutrition', 'plan'), queryFn: () => nutritionService.getPatientPlan(patientId) });
+  const plan = usePatientDietPlan(patientId);
   const today = useQuery({ queryKey: qk.patientPart(patientId, 'nutrition', 'today'), queryFn: () => nutritionService.getPatientToday(patientId) });
   const history = useQuery({ queryKey: qk.patientPart(patientId, 'nutrition', 'history'), queryFn: () => nutritionService.getPatientHistory(patientId) });
 

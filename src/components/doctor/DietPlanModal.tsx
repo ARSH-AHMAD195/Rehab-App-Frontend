@@ -5,7 +5,7 @@ import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { nutritionService } from '../../services/apiServices';
 import { ApiError } from '../../services/api';
 import { useFormErrors } from '../../lib/forms';
-import { EMPTY_OPTION, kcalGap, sumMeals, toRows, toSlots, type OptionRow, type SlotRow } from '../../lib/diet';
+import { emptyOption, kcalGap, nextKey, sumMeals, toRows, toSlots, type OptionRow, type SlotRow } from '../../lib/diet';
 import { qk } from '../../lib/queryClient';
 import { Alert, Button, Field, Input, Modal, ModalActions } from '../ui';
 import { useToast } from '../ui/toast';
@@ -13,6 +13,8 @@ import type { DietPlan } from '../../types/api';
 
 const MAX_SLOTS = 12;
 const MAX_OPTIONS = 20;
+/** The Health API refuses request bodies over 16 KB; Hindi text takes 3 bytes a letter. */
+const MAX_BODY_BYTES = 16 * 1024;
 
 /** Which meal a form key belongs to: `slots.0.kcal` (checks) or `slots[0].kcal` (DTO). -1 when it is not a meal field. */
 const mealIndex = (key: string) => {
@@ -53,7 +55,7 @@ export const DietPlanModal = ({ patientId, plan, onClose }: { patientId: string;
       ),
     );
   const toggle = (i: number) => setOpen((o) => o.map((v, j) => (j === i ? !v : v)));
-  const clearErrors = () => Object.keys(form.errors).forEach(form.clear);
+  const clearErrors = form.clearAll;
   const removeMeal = (i: number) => {
     clearErrors();
     setSlots((ss) => ss.filter((_, j) => j !== i));
@@ -63,6 +65,7 @@ export const DietPlanModal = ({ patientId, plan, onClose }: { patientId: string;
     setSlots((ss) => [
       ...ss,
       {
+        key: nextKey(),
         code: '',
         en: '',
         hi: '',
@@ -70,7 +73,7 @@ export const DietPlanModal = ({ patientId, plan, onClose }: { patientId: string;
         to: '',
         kcal: '',
         protein: '',
-        options: [EMPTY_OPTION],
+        options: [emptyOption()],
       },
     ]);
     setOpen((o) => [...o, true]);
@@ -82,14 +85,10 @@ export const DietPlanModal = ({ patientId, plan, onClose }: { patientId: string;
     setOpen((o) => o.map((v, i) => v || withErrors.includes(i)));
   }, [form.errors]);
 
+  const body = () => ({ version, dietLabel, targets: { kcal: Number(kcal), proteinG: Number(protein) }, slots: toSlots(slots) });
+
   const save = useMutation({
-    mutationFn: () =>
-      nutritionService.updatePatientPlan(patientId, {
-        version,
-        dietLabel,
-        targets: { kcal: Number(kcal), proteinG: Number(protein) },
-        slots: toSlots(slots),
-      }),
+    mutationFn: () => nutritionService.updatePatientPlan(patientId, body()),
     onSuccess: () => {
       toast.success('Diet plan saved.');
       void queryClient.invalidateQueries({
@@ -116,7 +115,18 @@ export const DietPlanModal = ({ patientId, plan, onClose }: { patientId: string;
       .filter((el) => el.name && el.willValidate && !el.validity.valid)
       .map((el) => mealIndex(el.name));
     if (invalid.length) flushSync(() => setOpen((o) => o.map((v, i) => v || invalid.includes(i))));
-    if (form.validate(e.currentTarget)) save.mutate();
+    if (!form.validate(e.currentTarget)) return;
+    // A window may run up to midnight ("22:00-00:00")
+    const backwards = slots.findIndex((s) => s.to <= s.from && s.to !== '00:00');
+    if (backwards >= 0) {
+      flushSync(() => setOpen((o) => o.map((v, i) => v || i === backwards)));
+      form.setFieldError(`slots.${backwards}.windowTo`, 'Must be later than the start time.');
+      return form.setFormError('Please correct the highlighted fields.');
+    }
+    if (new Blob([JSON.stringify(body())]).size > MAX_BODY_BYTES) {
+      return form.setFormError('This diet plan is too long to save. Remove some meals or food options, or shorten their names.');
+    }
+    save.mutate();
   };
 
   const totals = sumMeals(slots);
@@ -129,10 +139,10 @@ export const DietPlanModal = ({ patientId, plan, onClose }: { patientId: string;
         {form.formError && <Alert tone="error">{form.formError}</Alert>}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Daily calories (kcal)" error={err('targets.kcal')}>
-            <Input name="targets.kcal" type="number" inputMode="numeric" min="500" max="6000" step="1" required value={kcal} onChange={(e) => setKcal(e.target.value)} />
+            <Input name="targets.kcal" type="number" inputMode="numeric" min="1" max="6000" step="1" required value={kcal} onChange={(e) => setKcal(e.target.value)} />
           </Field>
           <Field label="Daily protein (g)" error={err('targets.proteinG')}>
-            <Input name="targets.proteinG" type="number" inputMode="decimal" min="10" max="300" step="any" required value={protein} onChange={(e) => setProtein(e.target.value)} />
+            <Input name="targets.proteinG" type="number" inputMode="decimal" min="1" max="300" step="any" required value={protein} onChange={(e) => setProtein(e.target.value)} />
           </Field>
         </div>
         <p className="text-sm text-slate-700">
@@ -148,7 +158,7 @@ export const DietPlanModal = ({ patientId, plan, onClose }: { patientId: string;
             const time = s.from && s.to ? `${s.from}–${s.to}` : '';
             const mealTotals = sumMeals([s]);
             return (
-              <li key={i} className="rounded-2xl border border-slate-200 bg-slate-50">
+              <li key={s.key ?? i} className="rounded-2xl border border-slate-200 bg-slate-50">
                 <div className="flex items-center gap-2 p-3">
                   <button
                     type="button"
@@ -209,7 +219,7 @@ export const DietPlanModal = ({ patientId, plan, onClose }: { patientId: string;
                     {s.options.map((o, k) => {
                       const at = `slots.${i}.options.${k}`;
                       return (
-                        <div key={k} className="flex items-end gap-2 rounded-xl border border-slate-200 bg-white p-2">
+                        <div key={o.key ?? k} className="flex items-end gap-2 rounded-xl border border-slate-200 bg-white p-2">
                           <div className="grid flex-1 gap-2 sm:grid-cols-2">
                             <Field label="Food" error={err(`${at}.label.en`)}>
                               <Input
@@ -257,7 +267,7 @@ export const DietPlanModal = ({ patientId, plan, onClose }: { patientId: string;
                         </div>
                       );
                     })}
-                    <Button variant="subtle" size="sm" disabled={s.options.length >= MAX_OPTIONS} onClick={() => updateSlot(i, { options: [...s.options, EMPTY_OPTION] })}>
+                    <Button variant="subtle" size="sm" disabled={s.options.length >= MAX_OPTIONS} onClick={() => updateSlot(i, { options: [...s.options, emptyOption()] })}>
                       <Plus className="h-4 w-4" aria-hidden="true" />
                       Add food
                     </Button>

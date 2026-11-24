@@ -153,8 +153,11 @@ export const foldListedConditions = (f: MedicalForm): MedicalForm => {
   };
 };
 
-/** Lists compare in any order. */
-const comparable = (value: unknown) => JSON.stringify(Array.isArray(value) ? [...value].sort() : (value ?? null));
+const isContact = (value: unknown): value is { phone: string } => typeof value === 'object' && value !== null && 'phone' in value;
+
+/** Lists compare in any order; a stored "+919876543210" matches the form's "9876543210". */
+const comparable = (value: unknown) =>
+  JSON.stringify(Array.isArray(value) ? [...value].sort() : isContact(value) ? { ...value, phone: normalizePhone(value.phone ?? '') } : (value ?? null));
 
 /** Only the fields that differ, so a PATCH never overwrites what it didn't change. A field the API didn't return counts as empty. */
 export const medicalChanges = (before: MedicalFields, after: MedicalFields): Partial<MedicalFields> =>

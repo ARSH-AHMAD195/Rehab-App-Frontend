@@ -189,3 +189,36 @@ describe('diet plan modal: edits', () => {
     expect(within(mealParts('Breakfast').panel).getByRole('button', { name: 'Remove Poha', hidden: true })).toBeDisabled();
   });
 });
+
+describe('diet plan modal: checks before saving (from #8)', () => {
+  beforeEach(() => updatePlan.mockReset());
+
+  it('refuses a meal whose end time is before its start, but allows ending at midnight', async () => {
+    const user = userEvent.setup();
+    renderModal();
+    const to = screen.getAllByLabelText('To')[0]!;
+    fireEvent.change(to, { target: { value: '07:00' } });
+    await user.click(screen.getByRole('button', { name: 'Save diet plan' }));
+    expect(await screen.findByText('Must be later than the start time.')).toBeInTheDocument();
+    expect(updatePlan).not.toHaveBeenCalled();
+
+    updatePlan.mockResolvedValue({});
+    fireEvent.change(to, { target: { value: '00:00' } });
+    await user.click(screen.getByRole('button', { name: 'Save diet plan' }));
+    expect(updatePlan).toHaveBeenCalledOnce();
+  });
+
+  it('stops a plan too big for the API with a clear message', async () => {
+    const user = userEvent.setup();
+    renderModal();
+    const { header, panel } = mealParts('Lunch');
+    await user.click(header);
+    for (let n = 0; n < 18; n++) fireEvent.click(within(panel).getByRole('button', { name: 'Add food' }));
+    // Hindi takes 3 bytes a letter: 20 foods of 300 letters is well over 16 KB
+    screen.getAllByLabelText('Food').forEach((el) => fireEvent.change(el, { target: { value: 'ऽ'.repeat(300) } }));
+    screen.getAllByLabelText('Quantity').forEach((el) => fireEvent.change(el, { target: { value: '1' } }));
+    await user.click(screen.getByRole('button', { name: 'Save diet plan' }));
+    expect(await screen.findByText(/too long to save/)).toBeInTheDocument();
+    expect(updatePlan).not.toHaveBeenCalled();
+  });
+});
