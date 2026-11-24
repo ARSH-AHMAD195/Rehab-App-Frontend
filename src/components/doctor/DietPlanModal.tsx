@@ -6,6 +6,7 @@ import { nutritionService } from '../../services/apiServices';
 import { ApiError } from '../../services/api';
 import { useFormErrors } from '../../lib/forms';
 import { emptyOption, kcalGap, nextKey, sumMeals, toRows, toSlots, type OptionRow, type SlotRow } from '../../lib/diet';
+import { FOOD_REFERENCE, findFood } from '../../lib/foodReference';
 import { qk } from '../../lib/queryClient';
 import { Alert, Button, Field, Input, Modal, ModalActions } from '../ui';
 import { useToast } from '../ui/toast';
@@ -28,6 +29,7 @@ export const DietPlanModal = ({ patientId, plan, onClose }: { patientId: string;
   const queryClient = useQueryClient();
   const form = useFormErrors();
   const baseId = useId();
+  const foodListId = `${baseId}-foods`;
   const [kcal, setKcal] = useState(String(plan.targets.kcal));
   const [protein, setProtein] = useState(String(plan.targets.proteinG));
   const [slots, setSlots] = useState<SlotRow[]>(() => toRows(plan.slots));
@@ -150,6 +152,12 @@ export const DietPlanModal = ({ patientId, plan, onClose }: { patientId: string;
         </p>
 
         <h3 className="pt-2 text-base font-bold text-slate-900">Meals</h3>
+        <p className="text-xs text-slate-600">Food suggestions and values are from the AIIMS Bhopal diet reference (approximate, standard home servings).</p>
+        <datalist id={foodListId}>
+          {FOOD_REFERENCE.map((f) => (
+            <option key={f.name} value={f.name} />
+          ))}
+        </datalist>
         <ol className="space-y-3">
           {slots.map((s, i) => {
             const isOpen = open[i] ?? false;
@@ -218,19 +226,24 @@ export const DietPlanModal = ({ patientId, plan, onClose }: { patientId: string;
                     {err(`slots.${i}.options`) && <p className="text-sm text-rose-700">{err(`slots.${i}.options`)}</p>}
                     {s.options.map((o, k) => {
                       const at = `slots.${i}.options.${k}`;
+                      const ref = findFood(o.en);
                       return (
                         <div key={o.key ?? k} className="flex items-end gap-2 rounded-xl border border-slate-200 bg-white p-2">
-                          <div className="grid flex-1 gap-2 sm:grid-cols-2">
+                          <div className="flex-1 space-y-1">
+                          <div className="grid gap-2 sm:grid-cols-2">
                             <Field label="Food" error={err(`${at}.label.en`)}>
                               <Input
                                 name={`${at}.label.en`}
                                 required
                                 maxLength={300}
+                                list={foodListId}
                                 value={o.en}
                                 onChange={(e) =>
                                   updateOption(i, k, {
                                     en: e.target.value,
                                     hi: '',
+                                    // A reference food fills an empty quantity; a typed one is never overwritten
+                                    ...(!o.quantity.trim() && { quantity: findFood(e.target.value)?.serving ?? '' }),
                                   })
                                 }
                               />
@@ -249,6 +262,12 @@ export const DietPlanModal = ({ patientId, plan, onClose }: { patientId: string;
                                 placeholder="e.g. 1 katori"
                               />
                             </Field>
+                          </div>
+                          {ref && (
+                            <p className="text-xs text-slate-600">
+                              Reference: {ref.kcal} kcal, {ref.proteinG} g protein per {ref.serving}
+                            </p>
+                          )}
                           </div>
                           <Button
                             variant="ghost"
