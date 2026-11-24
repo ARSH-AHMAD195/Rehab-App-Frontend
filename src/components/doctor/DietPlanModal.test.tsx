@@ -222,3 +222,64 @@ describe('diet plan modal: checks before saving (from #8)', () => {
     expect(updatePlan).not.toHaveBeenCalled();
   });
 });
+
+describe('diet plan modal: food reference', () => {
+  const openLunch = async (user: ReturnType<typeof userEvent.setup>) => {
+    renderModal();
+    const { header, panel } = mealParts('Lunch');
+    await user.click(header);
+    fireEvent.click(within(panel).getByRole('button', { name: 'Add food' }));
+    const foods = within(panel).getAllByLabelText('Food');
+    const quantities = within(panel).getAllByLabelText('Quantity');
+    return { food: foods[2]!, quantity: quantities[2]! as HTMLInputElement };
+  };
+
+  it('suggests reference foods and shows the source line once', () => {
+    renderModal();
+    expect(screen.getAllByText(/AIIMS Bhopal diet reference/)).toHaveLength(1);
+    const food = screen.getAllByLabelText('Food')[0]!;
+    const list = document.getElementById(food.getAttribute('list')!)!;
+    expect(list.querySelector('option[value="Idli"]')).not.toBeNull();
+  });
+
+  it('fills an empty quantity and shows the hint for a reference food', async () => {
+    const user = userEvent.setup();
+    const { food, quantity } = await openLunch(user);
+    fireEvent.change(food, { target: { value: 'poha (plain, cooked)' } });
+    expect(quantity).toHaveValue('1 katori (150 g)');
+    expect(screen.getByText('Reference: 180 kcal, 3 g protein per 1 katori (150 g)')).toBeInTheDocument();
+  });
+
+  it('never overwrites a typed quantity', async () => {
+    const user = userEvent.setup();
+    const { food, quantity } = await openLunch(user);
+    fireEvent.change(quantity, { target: { value: '2 bowls' } });
+    fireEvent.change(food, { target: { value: 'Poha (plain, cooked)' } });
+    expect(quantity).toHaveValue('2 bowls');
+  });
+
+  it('replaces the serving it filled when the food changes, but keeps one the doctor edited', async () => {
+    const user = userEvent.setup();
+    const { food, quantity } = await openLunch(user);
+    fireEvent.change(food, { target: { value: 'Idli' } });
+    expect(quantity).toHaveValue('2 pieces');
+    fireEvent.change(food, { target: { value: 'Upma' } });
+    expect(quantity).toHaveValue('1 katori (150 g)');
+    fireEvent.change(food, { target: { value: 'Upma with veg' } });
+    expect(quantity).toHaveValue('');
+    fireEvent.change(food, { target: { value: 'Idli' } });
+    fireEvent.change(quantity, { target: { value: '3 pieces' } });
+    fireEvent.change(food, { target: { value: 'Upma' } });
+    expect(quantity).toHaveValue('3 pieces');
+  });
+
+  it('saves only what the doctor entered', async () => {
+    const user = userEvent.setup();
+    const { food } = await openLunch(user);
+    fireEvent.change(food, { target: { value: 'Idli' } });
+    await user.click(screen.getByRole('button', { name: 'Save diet plan' }));
+    const [, body] = updatePlan.mock.calls[0] as [string, { slots: { kcal: number; options: object[] }[] }];
+    expect(body.slots[1]!.kcal).toBe(800);
+    expect(body.slots[1]!.options[2]).toEqual({ code: 'IDLI', label: { en: 'Idli', hi: null }, quantity: '2 pieces', kind: 'OPTION' });
+  });
+});
