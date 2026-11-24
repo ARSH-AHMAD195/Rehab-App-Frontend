@@ -74,6 +74,7 @@ const routes: RouteObject[] = [
         { path: 'patients', ...page(() => import('./pages/admin/AdminPatientsPage'), 'AdminPatientsPage') },
         { path: 'doctors', ...page(() => import('./pages/admin/AdminDoctorsPage'), 'AdminDoctorsPage') },
         { path: 'exercises', ...page(() => import('./pages/admin/AdminExercisesPage'), 'AdminExercisesPage') },
+        { path: 'clinical-limits', ...page(() => import('./pages/admin/AdminClinicalLimitsPage'), 'AdminClinicalLimitsPage') },
       ]),
       { path: '*', element: <Navigate to="/" replace /> },
     ],

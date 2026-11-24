@@ -315,7 +315,8 @@ export const Modal = ({ title, description, onClose, size = 'md', children }: Mo
     if (!dialog.contains(document.activeElement)) dialog.focus();
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCloseRef.current?.();
+      // Only the dialog holding focus: a confirm opened over another dialog closes alone
+      if (e.key === 'Escape' && dialog.contains(document.activeElement)) onCloseRef.current?.();
       if (e.key !== 'Tab') return;
       const focusable = [...dialog.querySelectorAll<HTMLElement>(FOCUSABLE)];
       const first = focusable[0];

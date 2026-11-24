@@ -184,6 +184,20 @@ export interface VitalTypeDef {
   step?: number;
 }
 
+/** GET /admin/alert-thresholds: the current version of one limit (patientId null = global). */
+export interface AlertThreshold {
+  id: Id;
+  type: VitalType;
+  field: 'systolic' | 'diastolic' | null;
+  low: number | null;
+  high: number | null;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH';
+  patientId: Id | null;
+  version: number;
+  effectiveFrom: string;
+  updatedBy: string;
+}
+
 /** `{ num }`, `{ systolic, diastolic }` (BP) or `{ text }` (NUTRITION). */
 export type ReadingValue = { num: number } | { systolic: number; diastolic: number } | { text: string };
 

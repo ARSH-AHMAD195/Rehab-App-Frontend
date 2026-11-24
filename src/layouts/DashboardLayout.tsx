@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Activity, Dumbbell, Heart, KeyRound, LogOut, Stethoscope, UserCircle, UserPlus, Users, Utensils, type LucideIcon } from 'lucide-react';
+import { Activity, Dumbbell, Gauge, Heart, KeyRound, LogOut, Stethoscope, UserCircle, UserPlus, Users, Utensils, type LucideIcon } from 'lucide-react';
 import { useSignedInUser, useAuth } from '../context/AuthContext';
 import { MedicalDisclaimer } from '../components/common/MedicalDisclaimer';
 import { ErrorBoundary } from '../components/ErrorBoundary';
@@ -38,6 +38,7 @@ const NAV: Record<Role, NavItem[]> = {
     { label: 'All Patients', short: 'Patients', to: '/admin/patients', icon: Users },
     { label: 'Exercise Library', short: 'Exercises', to: '/admin/exercises', icon: Dumbbell },
     { label: 'Doctor Accounts', short: 'Doctors', to: '/admin/doctors', icon: Stethoscope },
+    { label: 'Clinical limits', short: 'Limits', to: '/admin/clinical-limits', icon: Gauge },
   ],
 };
 

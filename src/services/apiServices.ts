@@ -1,5 +1,6 @@
 import { api, type QueryParams } from './api';
 import type {
+  AlertThreshold,
   CareAlert,
   CaseloadRow,
   Category,
@@ -92,8 +93,9 @@ export const doctorService = {
 export const adminService = {
   registerAdmin: (data: { name: string; email: string; phone?: string | null }) =>
     api.post<{ id: Id; invitation: InvitationStatus }>('/admins', data),
-  getThresholds: (params: Paged & { type?: VitalType; patientId?: Id } = {}) => api.get<Page<unknown>>('/admin/alert-thresholds', params),
-  setThreshold: (type: VitalType, data: Record<string, unknown>) => api.put<unknown>(`/admin/alert-thresholds/${type}`, data),
+  getThresholds: (params: Paged & { type?: VitalType; patientId?: Id } = {}) => api.get<Page<AlertThreshold>>('/admin/alert-thresholds', params),
+  setThreshold: (type: VitalType, data: { field: 'systolic' | 'diastolic' | null; low: number | null; high: number | null; severity: AlertThreshold['severity']; patientId: null }) =>
+    api.put<AlertThreshold>(`/admin/alert-thresholds/${type}`, data),
   updateVitalType: (type: VitalType, data: Record<string, unknown>) => api.put<VitalTypeDef>(`/admin/vital-types/${type}`, data),
 };
 
@@ -142,6 +144,8 @@ export const nutritionService = {
 // ---------- Investigations, triage and care-team alerts (Auth API) ----------
 
 export const clinicalService = {
+  /** Both null removes the range. */
+  setRange: (data: { test: string; field: string; low: number | null; high: number | null }) => api.put<unknown>('/admin/investigation-ranges', data),
   getTests: () => api.get<{ data: InvestigationTest[] }>('/investigation-tests').then((r) => r.data),
   getInvestigations: (patientId: Id) => api.get<{ patientId: Id; tests: InvestigationGridRow[] }>(`/patients/${patientId}/investigations`).then((r) => r.tests),
   addInvestigation: (patientId: Id, data: { test: string; takenOn: string; values?: Record<string, number | string>; wnl?: boolean; comment?: string | null }) =>
