@@ -2,6 +2,7 @@ import { useId, useState, type ReactNode } from 'react';
 import { CheckCircle2, ChevronDown, Circle } from 'lucide-react';
 import { biText, t } from '../../lib/i18n';
 import { formatDate } from '../../lib/format';
+import { MEAL_ADVICE } from '../../lib/features';
 import { cn } from '../../lib/cn';
 import { Badge, Card } from '../ui';
 import type { MealDay, MealHistoryDay } from '../../types/api';
@@ -82,6 +83,11 @@ export const MealSlots = ({ day, onToggle, busySlot }: { day: MealDay; onToggle?
             );
           })}
         </ul>
+        {MEAL_ADVICE && slot.advice && (
+          <p className="mt-3 whitespace-pre-line rounded-xl bg-teal-50 p-3 text-sm leading-relaxed text-teal-950 [overflow-wrap:anywhere]">
+            <strong>{onToggle ? t('Your doctor’s advice:') : 'Advice:'}</strong> {slot.advice}
+          </p>
+        )}
       </Card>
     ))}
   </div>

@@ -87,6 +87,8 @@ export const hi: Record<string, string> = {
   'How to do it': 'कैसे करें',
   Safety: 'सुरक्षा',
   'Your doctor’s note:': 'आपके डॉक्टर का नोट:',
+  'Your doctor’s advice:': 'आपके डॉक्टर की सलाह:',
+  'Advice from your doctor': 'आपके डॉक्टर की सलाह',
   'Stop straight away if you feel severe pain, chest pain, dizziness or unusual shortness of breath, and contact your care team.':
     'तेज़ दर्द, सीने में दर्द, चक्कर या असामान्य रूप से साँस फूलने पर तुरंत रुक जाएँ और अपनी देखभाल टीम से संपर्क करें।',
   Close: 'बंद करें',

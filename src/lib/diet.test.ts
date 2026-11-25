@@ -1,6 +1,16 @@
-import { describe, expect, it } from 'vitest';
-import { kcalGap, newCode, sumMeals, toRows, toSlots, type SlotRow } from './diet';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { kcalGap, newCode, nutrientText, sumMeals, toRows, toSlots, type SlotRow } from './diet';
 import type { MealSlot } from '../types/api';
+
+const flags = vi.hoisted(() => ({ meal: false }));
+vi.mock('./features', () => ({
+  get MEAL_ADVICE() {
+    return flags.meal;
+  },
+}));
+beforeEach(() => {
+  flags.meal = false;
+});
 
 describe('newCode', () => {
   it('makes an API code from a name', () => {
@@ -49,7 +59,7 @@ describe('diet plan form', () => {
   });
 });
 
-const meal = (kcal: string, protein: string): SlotRow => ({ code: '', en: '', hi: '', from: '', to: '', kcal, protein, options: [] });
+const meal = (kcal: string, protein: string): SlotRow => ({ code: '', en: '', hi: '', from: '', to: '', kcal, protein, advice: '', options: [] });
 
 describe('meal totals', () => {
   it('adds kcal to a whole number and protein to 1 dp', () => {
@@ -68,5 +78,59 @@ describe('meal totals', () => {
     expect(kcalGap(rows, '2100')).toBe(50);
     expect(kcalGap(rows, '2150')).toBe(0);
     expect(kcalGap(rows, '')).toBe(2150);
+  });
+});
+
+describe('nutrientText', () => {
+  it('shows kcal and protein, leaving out a part that is 0', () => {
+    expect(nutrientText(180, 3)).toBe('180 kcal · 3 g');
+    expect(nutrientText(30, 0)).toBe('30 kcal');
+    expect(nutrientText(0, 3)).toBe('3 g');
+    expect(nutrientText(0, 0)).toBe('');
+  });
+
+  it('shows decimals as given, without rounding', () => {
+    expect(nutrientText(180.5, 3.25)).toBe('180.5 kcal · 3.25 g');
+  });
+});
+
+describe('meal advice', () => {
+  it('reads advice into the row, blank when missing or null', () => {
+    expect(toRows([{ ...saved[0]!, advice: 'Eat slowly' }])[0]!.advice).toBe('Eat slowly');
+    expect(toRows([{ ...saved[0]!, advice: null }])[0]!.advice).toBe('');
+    expect(toRows(saved)[0]!.advice).toBe('');
+  });
+
+  it('sends trimmed advice, or null when blank, with the flag on', () => {
+    flags.meal = true;
+    const rows = toRows(saved);
+    rows[0]!.advice = '  Eat slowly  ';
+    expect(toSlots(rows)[0]!.advice).toBe('Eat slowly');
+    rows[0]!.advice = '   ';
+    expect(toSlots(rows)[0]).toHaveProperty('advice', null);
+  });
+
+  it('keeps a 500-character advice unchanged through toRows then toSlots, and again on the next load', () => {
+    flags.meal = true;
+    const advice = 'Eat slowly.\n' + 'x'.repeat(488);
+    expect(advice).toHaveLength(500);
+    const once = toSlots(toRows([{ ...saved[0]!, advice }]));
+    expect(once[0]!.advice).toBe(advice);
+    expect(toSlots(toRows(once))).toEqual(once);
+  });
+
+  it('trims advice on the way out, and a reload changes nothing more', () => {
+    flags.meal = true;
+    const rows = toRows(saved);
+    rows[0]!.advice = '  Take with water \n';
+    const first = toSlots(rows);
+    expect(first[0]!.advice).toBe('Take with water');
+    expect(toSlots(toRows(first))).toEqual(first);
+  });
+
+  it('leaves the advice key out entirely with the flag off', () => {
+    const rows = toRows(saved);
+    rows[0]!.advice = 'Eat slowly';
+    expect(toSlots(rows)[0]).not.toHaveProperty('advice');
   });
 });

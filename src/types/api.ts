@@ -161,6 +161,8 @@ export interface MedicalProfile extends MedicalFields {
   daysToSurgery: number | null;
   /** Doctors only: the API leaves it out entirely for the patient. Up to 2000 characters. */
   clinicalNotes?: string | null;
+  /** Written by the doctor for the patient (behind VITE_PATIENT_ADVICE) */
+  patientAdvice?: string | null;
   version: number;
   updatedAt: IsoDate | null;
   updatedBy: { id: Id; role: string } | null;
@@ -369,6 +371,8 @@ export interface MealSlot {
   window: string;
   kcal: number;
   proteinG: number;
+  /** The doctor's advice for this meal, shown to the patient (behind VITE_MEAL_ADVICE) */
+  advice?: string | null;
   options: FoodOption[];
 }
 

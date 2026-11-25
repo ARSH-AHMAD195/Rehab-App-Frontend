@@ -1,4 +1,5 @@
 import type { MealSlot } from '../types/api';
+import { MEAL_ADVICE } from './features';
 
 /**
  * A code for a new meal slot or food option, from its English name: "Evening snack" → "EVENING_SNACK".
@@ -18,7 +19,7 @@ export const newCode = (label: string, taken: Iterable<string>) => {
 
 * `key` is for React only, so a removed row doesn't hand its inputs to the next one. */
 export type OptionRow = { key?: number; code: string; en: string; hi: string; quantity: string };
-export type SlotRow = { key?: number; code: string; en: string; hi: string; from: string; to: string; kcal: string; protein: string; options: OptionRow[] };
+export type SlotRow = { key?: number; code: string; en: string; hi: string; from: string; to: string; kcal: string; protein: string; advice: string; options: OptionRow[] };
 
 let lastKey = 0;
 export const nextKey = () => ++lastKey;
@@ -36,6 +37,7 @@ export const toRows = (slots: MealSlot[]): SlotRow[] =>
       to,
       kcal: String(s.kcal),
       protein: String(s.proteinG),
+      advice: s.advice ?? '',
       options: s.options.map((o) => ({ key: nextKey(), code: o.code, en: o.label.en, hi: o.label.hi ?? '', quantity: o.quantity })),
     };
   });
@@ -69,6 +71,8 @@ export const toSlots = (rows: SlotRow[]): MealSlot[] => {
       window: `${r.from}-${r.to}`,
       kcal: Number(r.kcal),
       proteinG: Number(r.protein),
+      // The live backend rejects unknown fields, so the key is left out entirely while the flag is off
+      ...(MEAL_ADVICE && { advice: r.advice.trim() || null }),
       options: r.options.map((o) => {
         const optionCode = o.code || newCode(o.en, optionCodes);
         if (!o.code) optionCodes.push(optionCode);
@@ -78,3 +82,6 @@ export const toSlots = (rows: SlotRow[]): MealSlot[] => {
     };
   });
 };
+
+/** Nutrients of a food or meal as text: "180 kcal · 3 g". A part that is 0 is left out; both 0 gives "". */
+export const nutrientText = (kcal: number, proteinG: number) => [kcal ? `${kcal} kcal` : '', proteinG ? `${proteinG} g` : ''].filter(Boolean).join(' · ');
