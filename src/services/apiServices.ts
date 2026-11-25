@@ -45,7 +45,7 @@ type ListParams = { q?: string; active?: 'true' | 'false' | 'all'; limit?: numbe
 type Range = { from?: string; to?: string };
 type Paged = { limit?: number; cursor?: string };
 /** clinicalNotes: doctors only (a patient sending it gets 403). */
-export type MedicalUpdate = Partial<MedicalFields> & { clinicalNotes?: string | null; version: number };
+export type MedicalUpdate = Partial<MedicalFields> & { clinicalNotes?: string | null; patientAdvice?: string | null; version: number };
 
 // ---------- Auth API ----------
 

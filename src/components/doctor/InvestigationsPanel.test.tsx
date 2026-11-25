@@ -44,7 +44,17 @@ const renderWith = (ui: React.ReactNode) =>
     </QueryClientProvider>
   );
 
-beforeEach(() => updateMedical.mockReset());
+const flags = vi.hoisted(() => ({ advice: false }));
+vi.mock('../../lib/features', () => ({
+  get PATIENT_ADVICE() {
+    return flags.advice;
+  },
+}));
+
+beforeEach(() => {
+  flags.advice = false;
+  updateMedical.mockReset();
+});
 
 describe('triage reasons', () => {
   it('shows the date of the value behind a reason, formatted, and none when there is no date', async () => {
@@ -78,5 +88,45 @@ describe("doctors' notes", () => {
     await user.type(box, '\n Aspirin 75 mg \n\n');
     await user.click(within(box.closest('form')!).getByRole('button', { name: 'Save' }));
     expect(updateMedical).toHaveBeenCalledWith('p1', { version: 3, medications: ['Metformin 500 mg', 'Aspirin 75 mg'] });
+  });
+});
+
+describe('advice for the patient', () => {
+  it('has no card without the flag', async () => {
+    renderWith(<InvestigationsPanel patientId="p1" medical={medical} />);
+    await screen.findByRole('heading', { name: 'Doctors’ notes' });
+    expect(screen.queryByRole('heading', { name: 'Advice for the patient' })).not.toBeInTheDocument();
+  });
+
+  it('saves only patientAdvice, trimmed, with the profile version', async () => {
+    flags.advice = true;
+    const user = userEvent.setup();
+    updateMedical.mockResolvedValue({ ...medical, patientAdvice: 'Stop aspirin', version: 4 });
+    renderWith(<InvestigationsPanel patientId="p1" medical={medical} />);
+    expect(await screen.findByRole('heading', { name: 'Advice for the patient' })).toBeInTheDocument();
+    const box = screen.getByRole('textbox', { name: /^Advice/ });
+    const card = box.closest('form')!;
+    expect(within(card).getByText(/Test results page/)).toBeInTheDocument();
+    // Doctors' notes keep their own hint
+    expect(screen.getByText(/Only doctors see these/)).toBeInTheDocument();
+    await user.type(box, '  Stop aspirin  ');
+    await user.click(within(card).getByRole('button', { name: 'Save' }));
+    expect(updateMedical).toHaveBeenCalledWith('p1', { version: 3, patientAdvice: 'Stop aspirin' });
+    expect(await screen.findByText('Advice saved.')).toBeInTheDocument();
+  });
+
+  it('keeps the doctors’ notes copy and sends only clinicalNotes when the flag is on', async () => {
+    flags.advice = true;
+    const user = userEvent.setup();
+    updateMedical.mockResolvedValue({ ...medical, clinicalNotes: 'Private note', version: 4 });
+    renderWith(<InvestigationsPanel patientId="p1" medical={medical} />);
+    const box = await screen.findByRole('textbox', { name: /^Notes/ });
+    const card = box.closest('form')!;
+    expect(within(card).getByText('Only doctors see these, never the patient. Up to 2000 characters.')).toBeInTheDocument();
+    await user.type(box, 'Private note');
+    await user.click(within(card).getByRole('button', { name: 'Save' }));
+    await vi.waitFor(() => expect(updateMedical).toHaveBeenCalledTimes(1));
+    const body = updateMedical.mock.calls[0]![1] as Record<string, unknown>;
+    expect(Object.keys(body).sort()).toEqual(['clinicalNotes', 'version']);
   });
 });

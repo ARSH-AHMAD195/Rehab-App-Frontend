@@ -8,6 +8,7 @@ import { useFormErrors } from '../../lib/forms';
 import { cn } from '../../lib/cn';
 import { dateKeyIn, formatDate, labelize } from '../../lib/format';
 import { formatResult, GROUP_TITLES, testUnits } from '../../lib/investigations';
+import { PATIENT_ADVICE } from '../../lib/features';
 import { qk } from '../../lib/queryClient';
 import { Alert, Button, buttonClass, Card, ConfirmDialog, Field, Input, Modal, ModalActions, PageLoader, SectionTitle, Select, Textarea } from '../ui';
 import { useToast } from '../ui/toast';
@@ -126,7 +127,7 @@ const AddResultModal = ({ patientId, test, onClose }: { patientId: string; test:
   );
 };
 
-type NotesField = 'medications' | 'clinicalNotes';
+type NotesField = 'medications' | 'clinicalNotes' | 'patientAdvice';
 const NOTES: Record<NotesField, { title: string; label: string; hint: string; placeholder: string; maxLength?: number; saved: string; failed: string }> = {
   medications: {
     title: 'Medications',
@@ -145,12 +146,21 @@ const NOTES: Record<NotesField, { title: string; label: string; hint: string; pl
     saved: 'Notes saved.',
     failed: 'Could not save the notes.',
   },
+  patientAdvice: {
+    title: 'Advice for the patient',
+    label: 'Advice',
+    hint: 'The patient sees this on their Test results page. Up to 2000 characters.',
+    placeholder: 'e.g. Stop aspirin 5 days before surgery. Take your inhaler every morning.',
+    maxLength: 2000,
+    saved: 'Advice saved.',
+    failed: 'Could not save the advice.',
+  },
 };
 const notesText = (medical: MedicalProfile, field: NotesField) =>
-  field === 'medications' ? (medical.medications?.join('\n') ?? '') : (medical.clinicalNotes ?? '');
+  field === 'medications' ? (medical.medications?.join('\n') ?? '') : (medical[field] ?? '');
 /** Medications are one per line; notes are kept as typed, trimmed. */
 const notesValue = (text: string, field: NotesField) => {
-  if (field === 'clinicalNotes') return text.trim() || null;
+  if (field !== 'medications') return text.trim() || null;
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
   return lines.length ? lines : null;
 };
@@ -316,6 +326,7 @@ export const InvestigationsPanel = ({ patientId, medical }: { patientId: string;
 
       {medical && <NotesCard patientId={patientId} medical={medical} field="medications" />}
       {medical && <NotesCard patientId={patientId} medical={medical} field="clinicalNotes" />}
+      {medical && PATIENT_ADVICE && <NotesCard patientId={patientId} medical={medical} field="patientAdvice" />}
 
       {adding && <AddResultModal patientId={patientId} test={adding} onClose={() => setAdding(null)} />}
       {retracting && (
