@@ -11,12 +11,6 @@ const result = (id: string, takenOn: string, values: Record<string, number | str
 let grid: unknown[] = [];
 let medical: () => Promise<unknown> = () => Promise.resolve({ patientAdvice: null });
 const { getMedical } = vi.hoisted(() => ({ getMedical: vi.fn() }));
-const flags = vi.hoisted(() => ({ advice: false }));
-vi.mock('../../lib/features', () => ({
-  get PATIENT_ADVICE() {
-    return flags.advice;
-  },
-}));
 vi.mock('../../services/apiServices', () => ({
   clinicalService: {
     getTests: () => Promise.resolve([{ code: 'HB', label: 'Haemoglobin', fields: [{ key: 'value', label: 'Value', kind: 'number', unit: 'g/dL' }] }]),
@@ -34,7 +28,6 @@ const renderPage = () =>
 
 beforeEach(() => {
   grid = [];
-  flags.advice = false;
   medical = () => Promise.resolve({ patientAdvice: null });
   getMedical.mockReset();
   getMedical.mockImplementation(() => medical());
@@ -84,8 +77,7 @@ describe('advice from the doctor', () => {
     grid = [{ test: 'HB', label: 'Haemoglobin', group: 'HAEMATOLOGY', results: [result('a', '2026-11-21', { value: 11 })] }];
   };
 
-  it('shows the advice card at the top when the flag is on', async () => {
-    flags.advice = true;
+  it('shows the advice card at the top', async () => {
     withResult();
     medical = () => Promise.resolve({ patientAdvice: 'Stop aspirin 5 days before surgery.' });
     renderPage();
@@ -93,23 +85,7 @@ describe('advice from the doctor', () => {
     expect(screen.getByText('Stop aspirin 5 days before surgery.')).toBeInTheDocument();
   });
 
-  it('shows nothing when the flag is off, even with advice', async () => {
-    withResult();
-    medical = () => Promise.resolve({ patientAdvice: 'Stop aspirin' });
-    renderPage();
-    await screen.findByText('Haemoglobin');
-    expect(screen.queryByText('Stop aspirin')).not.toBeInTheDocument();
-  });
-
-  it('never asks for the medical profile when the flag is off', async () => {
-    withResult();
-    renderPage();
-    await screen.findByText('Haemoglobin');
-    expect(getMedical).not.toHaveBeenCalled();
-  });
-
   it('shows advice as literal text, never as HTML', async () => {
-    flags.advice = true;
     withResult();
     medical = () => Promise.resolve({ patientAdvice: '<b>x</b>' });
     const { container } = renderPage();
@@ -118,7 +94,6 @@ describe('advice from the doctor', () => {
   });
 
   it('shows the advice heading in Hindi when Hindi is chosen', async () => {
-    flags.advice = true;
     withResult();
     medical = () => Promise.resolve({ patientAdvice: 'Stop aspirin' });
     setLang('hi');
@@ -127,7 +102,6 @@ describe('advice from the doctor', () => {
   });
 
   it('shows nothing when the advice is empty', async () => {
-    flags.advice = true;
     withResult();
     medical = () => Promise.resolve({ patientAdvice: '  ' });
     renderPage();
@@ -136,7 +110,6 @@ describe('advice from the doctor', () => {
   });
 
   it('still renders the results when the medical profile fails to load', async () => {
-    flags.advice = true;
     withResult();
     medical = () => Promise.reject(new Error('boom'));
     renderPage();

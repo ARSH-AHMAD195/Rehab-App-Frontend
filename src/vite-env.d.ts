@@ -11,8 +11,6 @@ interface ImportMetaEnv {
   readonly VITE_SENTRY_DSN?: string;
   readonly VITE_IDLE_TIMEOUT_MINUTES?: string;
   readonly VITE_APP_VERSION?: string;
-  readonly VITE_MEAL_ADVICE?: string;
-  readonly VITE_PATIENT_ADVICE?: string;
 }
 
 interface ImportMeta {

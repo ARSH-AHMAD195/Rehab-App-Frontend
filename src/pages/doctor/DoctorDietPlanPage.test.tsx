@@ -8,13 +8,7 @@ import { ApiError } from '../../services/api';
 import { DoctorDietPlanPage } from './DoctorDietPlanPage';
 import type { DietPlan } from '../../types/api';
 
-const { updatePlan, getPlan, flags } = vi.hoisted(() => ({ updatePlan: vi.fn(), getPlan: vi.fn(), flags: { meal: false } }));
-
-vi.mock('../../lib/features', () => ({
-  get MEAL_ADVICE() {
-    return flags.meal;
-  },
-}));
+const { updatePlan, getPlan } = vi.hoisted(() => ({ updatePlan: vi.fn(), getPlan: vi.fn() }));
 
 vi.mock('../../services/apiServices', () => ({
   nutritionService: {
@@ -90,7 +84,6 @@ const mealParts = (name: string) => {
 };
 
 beforeEach(() => {
-  flags.meal = false;
   updatePlan.mockReset();
   updatePlan.mockResolvedValue({});
   getPlan.mockReset();
@@ -110,7 +103,9 @@ describe('diet plan page: meal cards', () => {
     expect(card).toHaveTextContent('08:00–09:00');
     expect(card).toHaveTextContent('600 kcal · 20 g');
     expect(card).toHaveTextContent('Poha, 1 bowl');
-    expect(lunch.header.closest('li')).toHaveTextContent('Roti, 3 · Curd, 80 g');
+    const lunchFoods = within(lunch.header.closest('li')!).getAllByRole('listitem');
+    expect(lunchFoods.map((li) => li.textContent)).toEqual(['Roti, 3', 'Curd, 80 g']);
+    expect(screen.queryByText(/Roti, 3 · Curd/)).toBeNull();
 
     const summary = screen.getByText(/Meals add up to/).closest('p')!;
     expect(within(summary).getByText('1400 kcal')).toBeInTheDocument();
@@ -167,6 +162,7 @@ describe('diet plan page: save payload', () => {
           window: '08:00-09:00',
           kcal: 600,
           proteinG: 20,
+          advice: null,
           options: [{ code: 'POHA', label: { en: 'Poha', hi: null }, quantity: '1 bowl', kind: 'OPTION' }],
         },
         {
@@ -175,6 +171,7 @@ describe('diet plan page: save payload', () => {
           window: '13:00-14:00',
           kcal: 800,
           proteinG: 30,
+          advice: null,
           options: [
             { code: 'ROTI', label: { en: 'Roti', hi: 'रोटी' }, quantity: '3', kind: 'OPTION' },
             // Was an add-on before: the add-on type is gone from the form, so it goes out as a main option
@@ -316,7 +313,7 @@ describe('diet plan page: food reference', () => {
 describe('diet plan page: layout C', () => {
   it('renders the timeline in plan order with the start times and a back link', async () => {
     await renderPage();
-    const items = screen.getAllByRole('listitem').filter((li) => li.closest('ol'));
+    const items = screen.getAllByRole('listitem').filter((li) => li.parentElement?.tagName === 'OL');
     expect(items).toHaveLength(2);
     expect(items[0]).toHaveTextContent('08:00');
     expect(items[0]).toHaveTextContent('Breakfast');
@@ -464,8 +461,7 @@ describe('diet plan page: submit with an empty meal name', () => {
 describe('diet plan page: meal advice', () => {
   const adviceBox = (name: string) => within(mealParts(name).panel).queryByRole('textbox', { name: /Advice for this meal/ });
 
-  it('shows the box and saves the typed advice when the flag is on', async () => {
-    flags.meal = true;
+  it('shows the box above the foods and saves the typed advice', async () => {
     getPlan.mockResolvedValue({ ...plan, slots: [{ ...plan.slots[0]!, advice: 'Eat slowly' }, plan.slots[1]!] });
     const user = userEvent.setup();
     await renderPage();
@@ -474,7 +470,8 @@ describe('diet plan page: meal advice', () => {
     await user.click(mealParts('Lunch').header);
     const box = adviceBox('Lunch')!;
     expect(box).toHaveAttribute('maxlength', '500');
-    expect(within(mealParts('Lunch').panel).getByText('The patient sees this under the meal.')).toBeInTheDocument();
+    expect(within(mealParts('Lunch').panel).getByText("The patient sees this above the meal's foods.")).toBeInTheDocument();
+    expect(box.compareDocumentPosition(within(mealParts('Lunch').panel).getAllByLabelText('Food')[0]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     await user.type(box, ' Warm water ');
     await user.click(screen.getByRole('button', { name: 'Save diet plan' }));
     const slots = updatePlan.mock.calls[0]![1].slots;
@@ -483,7 +480,6 @@ describe('diet plan page: meal advice', () => {
   });
 
   it('stops typing at 500 characters and saves a full 500 unchanged', async () => {
-    flags.meal = true;
     const user = userEvent.setup();
     await renderPage();
     await user.click(mealParts('Lunch').header);
@@ -495,11 +491,50 @@ describe('diet plan page: meal advice', () => {
     expect(updatePlan.mock.calls[0]![1].slots[1].advice).toBe('y'.repeat(500));
   });
 
-  it('shows no box and sends no advice key when the flag is off', async () => {
+  it('sends advice as null on a meal with none', async () => {
     const user = userEvent.setup();
     await renderPage();
-    expect(adviceBox('Lunch')).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Save diet plan' }));
-    expect(updatePlan.mock.calls[0]![1].slots.every((s: object) => !('advice' in s))).toBe(true);
+    expect(updatePlan.mock.calls[0]![1].slots.map((s: { advice: unknown }) => s.advice)).toEqual([null, null]);
+  });
+});
+
+describe('diet plan page: reference servings', () => {
+  const openLunchRoti = async (user: ReturnType<typeof userEvent.setup>) => {
+    await renderPage();
+    await user.click(mealParts('Lunch').header);
+    const panel = mealParts('Lunch').panel;
+    fireEvent.change(within(panel).getAllByLabelText('Food')[0]!, { target: { value: 'Roti / Chapati' } });
+    fireEvent.change(within(panel).getAllByLabelText('Quantity')[0]!, { target: { value: '1 medium (30 g)' } });
+    return within(panel);
+  };
+
+  it('sets the quantity to the servings count and shows the servings nutrients, leaving the meal kcal alone', async () => {
+    const user = userEvent.setup();
+    const panel = await openLunchRoti(user);
+    fireEvent.change(panel.getAllByLabelText('Servings')[0]!, { target: { value: '2' } });
+    expect(panel.getAllByLabelText('Quantity')[0]).toHaveValue('2 × 1 medium (30 g)');
+    expect(screen.getByText(/2 servings: 160 kcal · 6 g/)).toBeInTheDocument();
+    expect(panel.getByLabelText('kcal')).toHaveValue(800);
+    await user.click(screen.getByRole('button', { name: 'Save diet plan' }));
+    const [, body] = updatePlan.mock.calls[0] as [string, { slots: { kcal: number; options: object[] }[] }];
+    expect(body.slots[1]!.kcal).toBe(800);
+    expect(body.slots[1]!.options[0]).toEqual({ code: 'ROTI', label: { en: 'Roti / Chapati', hi: null }, quantity: '2 × 1 medium (30 g)', kind: 'OPTION' });
+  });
+
+  it('accepts a half serving typed in pieces', async () => {
+    const user = userEvent.setup();
+    const panel = await openLunchRoti(user);
+    const servings = panel.getAllByLabelText('Servings')[0]!;
+    await user.clear(servings);
+    await user.type(servings, '0.5');
+    expect(panel.getAllByLabelText('Quantity')[0]).toHaveValue('0.5 × 1 medium (30 g)');
+    expect(servings).toHaveValue(0.5);
+  });
+
+  it('shows no servings box for a hand-typed quantity', async () => {
+    const panel = await openLunchRoti(userEvent.setup());
+    fireEvent.change(panel.getAllByLabelText('Quantity')[0]!, { target: { value: '3' } });
+    expect(panel.queryByLabelText('Servings')).toBeNull();
   });
 });

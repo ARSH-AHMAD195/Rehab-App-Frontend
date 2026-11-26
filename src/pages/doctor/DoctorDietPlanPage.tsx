@@ -7,9 +7,8 @@ import { nutritionService, patientService } from '../../services/apiServices';
 import { ApiError } from '../../services/api';
 import { useFormErrors } from '../../lib/forms';
 import { usePatientDietPlan } from '../../lib/hooks';
-import { emptyOption, kcalGap, nextKey, nutrientText, sumMeals, toRows, toSlots, type OptionRow, type SlotRow } from '../../lib/diet';
+import { emptyOption, kcalGap, MAX_SERVINGS, nextKey, nutrientText, servingsOf, sumMeals, toRows, toSlots, withServings, type OptionRow, type SlotRow } from '../../lib/diet';
 import { FOOD_REFERENCE, findFood } from '../../lib/foodReference';
-import { MEAL_ADVICE } from '../../lib/features';
 import { qk } from '../../lib/queryClient';
 import { Alert, Button, buttonClass, Card, ErrorState, Field, Input, PageHeader, PageLoader, Textarea } from '../../components/ui';
 import { useToast } from '../../components/ui/toast';
@@ -25,6 +24,30 @@ const MAX_RESULTS = 8;
 const mealIndex = (key: string) => {
   const m = /^slots[.[](\d+)[.\]]/.exec(key);
   return m ? Number(m[1]) : -1;
+};
+
+/** Servings of a reference food, typed as a count and saved into the quantity. Its own draft lets "0.5" pass through "0.". */
+const ServingsInput = ({ value, onChange }: { value: number; onChange: (n: number) => void }) => {
+  const [draft, setDraft] = useState<string | null>(null);
+  return (
+    <label className="inline-flex items-center gap-1.5">
+      Servings
+      <input
+        type="number"
+        min="0.5"
+        max={MAX_SERVINGS}
+        step="0.5"
+        className="h-8 w-16 rounded-lg border border-slate-300 px-2 text-sm text-slate-900"
+        value={draft ?? value}
+        onChange={(e) => {
+          setDraft(e.target.value);
+          const n = Number(e.target.value);
+          if (e.target.value.trim() && n > 0 && n <= MAX_SERVINGS) onChange(n);
+        }}
+        onBlur={() => setDraft(null)}
+      />
+    </label>
+  );
 };
 
 /** The patient's own diet chart: daily targets and every meal slot with its food options. Saves replace the whole chart. */
@@ -180,10 +203,7 @@ const DietPlanForm = ({ patientId, plan }: { patientId: string; plan: DietPlan }
               const time = s.from && s.to ? `${s.from}–${s.to}` : '';
               const mealTotals = sumMeals([s]);
               const mealNutrients = nutrientText(mealTotals.kcal, mealTotals.protein);
-              const foods = s.options
-                .filter((o) => o.en.trim())
-                .map((o) => [o.en.trim(), o.quantity.trim()].filter(Boolean).join(', '))
-                .join(' · ');
+              const foods = s.options.filter((o) => o.en.trim()).map((o) => [o.en.trim(), o.quantity.trim()].filter(Boolean).join(', '));
               return (
                 <li key={s.key ?? i} className="flex gap-3">
                   <span className="w-14 shrink-0 pt-4 text-right text-sm font-semibold text-slate-700">{s.from}</span>
@@ -197,8 +217,14 @@ const DietPlanForm = ({ patientId, plan }: { patientId: string; plan: DietPlan }
                             {mealNutrients && <span className="text-sm text-slate-600">{mealNutrients}</span>}
                             {!isOpen && errorMeals.has(i) && <span className="text-sm font-semibold text-rose-700">Needs attention</span>}
                           </div>
-                          {MEAL_ADVICE && !isOpen && s.advice.trim() && <p className="mt-1 line-clamp-1 text-sm italic text-slate-600">{s.advice.trim()}</p>}
-                          {!isOpen && foods && <p className="mt-1 text-sm text-slate-600 [overflow-wrap:anywhere]">{foods}</p>}
+                          {!isOpen && s.advice.trim() && <p className="mt-1 line-clamp-1 text-sm italic text-slate-600">{s.advice.trim()}</p>}
+                          {!isOpen && foods.length > 0 && (
+                            <ul className="mt-1 space-y-0.5 text-sm text-slate-600 [overflow-wrap:anywhere]">
+                              {foods.map((f, k) => (
+                                <li key={k}>{f}</li>
+                              ))}
+                            </ul>
+                          )}
                         </div>
                         <Button variant="subtle" size="sm" aria-expanded={isOpen} aria-controls={panelId} onClick={() => toggle(i)}>
                           {isOpen ? 'Done' : 'Edit'}
@@ -213,6 +239,17 @@ const DietPlanForm = ({ patientId, plan }: { patientId: string; plan: DietPlan }
                       <div id={panelId} hidden={!isOpen} className="space-y-3 border-t border-slate-200 p-4">
                         <Field label="Name" error={err(`slots.${i}.label.en`)}>
                           <Input name={`slots.${i}.label.en`} required maxLength={300} value={s.en} onChange={(e) => updateSlot(i, { en: e.target.value, hi: '' })} placeholder="e.g. Lunch" />
+                        </Field>
+                        {/* Above the foods: the patient reads it before the list */}
+                        <Field label="Advice for this meal (optional)" hint="The patient sees this above the meal's foods." error={err(`slots.${i}.advice`)}>
+                          <Textarea
+                            name={`slots.${i}.advice`}
+                            rows={2}
+                            maxLength={500}
+                            value={s.advice}
+                            onChange={(e) => updateSlot(i, { advice: e.target.value })}
+                            placeholder="e.g. Mash and give with milk or water"
+                          />
                         </Field>
                         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                           <Field label="From" error={err(`slots.${i}.window`)}>
@@ -238,18 +275,6 @@ const DietPlanForm = ({ patientId, plan }: { patientId: string; plan: DietPlan }
                             />
                           </Field>
                         </div>
-                        {MEAL_ADVICE && (
-                          <Field label="Advice for this meal (optional)" hint="The patient sees this under the meal." error={err(`slots.${i}.advice`)}>
-                            <Textarea
-                              name={`slots.${i}.advice`}
-                              rows={2}
-                              maxLength={500}
-                              value={s.advice}
-                              onChange={(e) => updateSlot(i, { advice: e.target.value })}
-                              placeholder="e.g. Eat slowly; take with warm water"
-                            />
-                          </Field>
-                        )}
 
                         <fieldset className="space-y-2">
                           <legend className="mb-1 text-sm font-semibold text-slate-800">Foods</legend>
@@ -258,6 +283,7 @@ const DietPlanForm = ({ patientId, plan }: { patientId: string; plan: DietPlan }
                             const at = `slots.${i}.options.${k}`;
                             const ref = findFood(o.en);
                             const hint = ref && nutrientText(ref.kcal, ref.proteinG);
+                            const servings = ref ? servingsOf(o.quantity, ref.serving) : null;
                             return (
                               <div key={o.key ?? k} className="flex items-end gap-2 rounded-xl border border-slate-200 bg-white p-2">
                                 <div className="flex-1 space-y-1">
@@ -273,9 +299,9 @@ const DietPlanForm = ({ patientId, plan }: { patientId: string; plan: DietPlan }
                                           updateOption(i, k, {
                                             en: e.target.value,
                                             hi: '',
-                                            // A reference food fills an empty quantity, or replaces the serving it filled for the previous
+                                            // A reference food fills an empty quantity, or replaces the servings it filled for the previous
                                             // food; a quantity the doctor typed is never overwritten
-                                            ...((!o.quantity.trim() || o.quantity === ref?.serving) && { quantity: findFood(e.target.value)?.serving ?? '' }),
+                                            ...((!o.quantity.trim() || servings !== null) && { quantity: findFood(e.target.value)?.serving ?? '' }),
                                           })
                                         }
                                       />
@@ -296,9 +322,17 @@ const DietPlanForm = ({ patientId, plan }: { patientId: string; plan: DietPlan }
                                     </Field>
                                   </div>
                                   {ref && hint && (
-                                    <p className="text-xs text-slate-600">
-                                      Reference: {hint} per {ref.serving}
-                                    </p>
+                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
+                                      <span>
+                                        Reference: {hint} per {ref.serving}
+                                        {servings !== null &&
+                                          servings !== 1 &&
+                                          ` · ${servings} servings: ${nutrientText(Math.round(ref.kcal * servings), Math.round(ref.proteinG * servings * 10) / 10)}`}
+                                      </span>
+                                      {servings !== null && (
+                                        <ServingsInput value={servings} onChange={(n) => updateOption(i, k, { quantity: withServings(n, ref.serving) })} />
+                                      )}
+                                    </div>
                                   )}
                                 </div>
                                 <Button
