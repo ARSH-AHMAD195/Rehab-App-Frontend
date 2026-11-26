@@ -12,6 +12,7 @@ interface ImportMetaEnv {
   readonly VITE_IDLE_TIMEOUT_MINUTES?: string;
   readonly VITE_APP_VERSION?: string;
   readonly VITE_ADVICE_HISTORY?: string;
+  readonly VITE_FOOD_NUTRIENTS?: string;
 }
 
 interface ImportMeta {

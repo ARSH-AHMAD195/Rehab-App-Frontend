@@ -7,7 +7,25 @@ import { nutritionService, patientService } from '../../services/apiServices';
 import { ApiError } from '../../services/api';
 import { useFormErrors } from '../../lib/forms';
 import { usePatientDietPlan } from '../../lib/hooks';
-import { emptyOption, kcalGap, MAX_SERVINGS, nextKey, nutrientText, servingsOf, sumMeals, toRows, toSlots, withServings, type OptionRow, type SlotRow } from '../../lib/diet';
+import {
+  autoNutrients,
+  autoNutrientsFor,
+  emptyOption,
+  foodSums,
+  foodsComplete,
+  kcalGap,
+  MAX_SERVINGS,
+  nextKey,
+  nutrientText,
+  servingsOf,
+  sumMeals,
+  toRows,
+  toSlots,
+  withServings,
+  type OptionRow,
+  type SlotRow,
+} from '../../lib/diet';
+import { FOOD_NUTRIENTS } from '../../lib/features';
 import { FOOD_REFERENCE, findFood } from '../../lib/foodReference';
 import { qk } from '../../lib/queryClient';
 import { Alert, Button, buttonClass, Card, ErrorState, Field, Input, PageHeader, PageLoader, Textarea } from '../../components/ui';
@@ -121,7 +139,10 @@ const DietPlanForm = ({ patientId, plan }: { patientId: string; plan: DietPlan }
   /** Adds a reference food to the active meal. Only the food: the meal's kcal and protein stay as typed. */
   const addFood = (food: (typeof FOOD_REFERENCE)[number]) => {
     if (active === null) return;
-    updateSlot(active, { options: [...slots[active]!.options, { ...emptyOption(), en: food.name, quantity: food.serving }] });
+    // With per-food nutrients on, the food also fills in its kcal and protein for one serving
+    updateSlot(active, {
+      options: [...slots[active]!.options, { ...emptyOption(), en: food.name, quantity: food.serving, ...(FOOD_NUTRIENTS ? autoNutrientsFor(food, 1) : {}) }],
+    });
     setOpen((o) => o.map((v, j) => v || j === active));
   };
 
@@ -204,6 +225,10 @@ const DietPlanForm = ({ patientId, plan }: { patientId: string; plan: DietPlan }
               const mealTotals = sumMeals([s]);
               const mealNutrients = nutrientText(mealTotals.kcal, mealTotals.protein);
               const foods = s.options.filter((o) => o.en.trim()).map((o) => [o.en.trim(), o.quantity.trim()].filter(Boolean).join(', '));
+              // Foods with values (flag on): the meal's kcal and protein are their sum and read-only
+              const counted = FOOD_NUTRIENTS && foodsComplete(s);
+              const sums = foodSums(s);
+              const mealHint = FOOD_NUTRIENTS ? (counted ? 'Sum of the foods' : 'Add kcal and protein to every food to total this meal') : undefined;
               return (
                 <li key={s.key ?? i} className="flex gap-3">
                   <span className="w-14 shrink-0 pt-4 text-right text-sm font-semibold text-slate-700">{s.from}</span>
@@ -258,10 +283,21 @@ const DietPlanForm = ({ patientId, plan }: { patientId: string; plan: DietPlan }
                           <Field label="To" error={err(`slots.${i}.windowTo`)}>
                             <Input name={`slots.${i}.windowTo`} type="time" required value={s.to} onChange={(e) => updateSlot(i, { to: e.target.value })} />
                           </Field>
-                          <Field label="kcal" error={err(`slots.${i}.kcal`)}>
-                            <Input name={`slots.${i}.kcal`} type="number" inputMode="numeric" min="0" max="3000" step="any" required value={s.kcal} onChange={(e) => updateSlot(i, { kcal: e.target.value })} />
+                          <Field label="kcal" error={err(`slots.${i}.kcal`)} hint={mealHint}>
+                            <Input
+                              name={`slots.${i}.kcal`}
+                              type="number"
+                              inputMode="numeric"
+                              min="0"
+                              max="3000"
+                              step="any"
+                              required
+                              readOnly={counted}
+                              value={counted ? String(sums.kcal) : s.kcal}
+                              onChange={(e) => updateSlot(i, { kcal: e.target.value })}
+                            />
                           </Field>
-                          <Field label="Protein (g)" error={err(`slots.${i}.proteinG`)}>
+                          <Field label="Protein (g)" error={err(`slots.${i}.proteinG`)} hint={mealHint}>
                             <Input
                               name={`slots.${i}.proteinG`}
                               type="number"
@@ -270,7 +306,8 @@ const DietPlanForm = ({ patientId, plan }: { patientId: string; plan: DietPlan }
                               max="200"
                               step="any"
                               required
-                              value={s.protein}
+                              readOnly={counted}
+                              value={counted ? String(sums.protein) : s.protein}
                               onChange={(e) => updateSlot(i, { protein: e.target.value })}
                             />
                           </Field>
@@ -295,15 +332,24 @@ const DietPlanForm = ({ patientId, plan }: { patientId: string; plan: DietPlan }
                                         maxLength={300}
                                         list={foodListId}
                                         value={o.en}
-                                        onChange={(e) =>
+                                        onChange={(e) => {
+                                          const next = findFood(e.target.value);
+                                          // A reference food fills an empty quantity, or replaces the servings it filled for the previous
+                                          // food; a quantity the doctor typed is never overwritten
+                                          const refill = !o.quantity.trim() || servings !== null;
+                                          const quantity = refill ? (next?.serving ?? '') : o.quantity;
                                           updateOption(i, k, {
                                             en: e.target.value,
                                             hi: '',
-                                            // A reference food fills an empty quantity, or replaces the servings it filled for the previous
-                                            // food; a quantity the doctor typed is never overwritten
-                                            ...((!o.quantity.trim() || servings !== null) && { quantity: findFood(e.target.value)?.serving ?? '' }),
-                                          })
-                                        }
+                                            ...(refill && { quantity }),
+                                            ...(FOOD_NUTRIENTS &&
+                                              autoNutrients(
+                                                { kcal: o.kcal, protein: o.protein },
+                                                autoNutrientsFor(ref, servings),
+                                                autoNutrientsFor(next, next ? servingsOf(quantity, next.serving) : null),
+                                              )),
+                                          });
+                                        }}
                                       />
                                     </Field>
                                     <Field label="Quantity" error={err(`${at}.quantity`)}>
@@ -321,6 +367,34 @@ const DietPlanForm = ({ patientId, plan }: { patientId: string; plan: DietPlan }
                                       />
                                     </Field>
                                   </div>
+                                  {FOOD_NUTRIENTS && (
+                                    <div className="grid gap-2 sm:grid-cols-2">
+                                      <Field label="Food kcal" error={err(`${at}.kcal`)}>
+                                        <Input
+                                          name={`${at}.kcal`}
+                                          type="number"
+                                          inputMode="numeric"
+                                          min="0"
+                                          max="3000"
+                                          step="any"
+                                          value={o.kcal}
+                                          onChange={(e) => updateOption(i, k, { kcal: e.target.value })}
+                                        />
+                                      </Field>
+                                      <Field label="Food protein (g)" error={err(`${at}.proteinG`)}>
+                                        <Input
+                                          name={`${at}.proteinG`}
+                                          type="number"
+                                          inputMode="decimal"
+                                          min="0"
+                                          max="200"
+                                          step="any"
+                                          value={o.protein}
+                                          onChange={(e) => updateOption(i, k, { protein: e.target.value })}
+                                        />
+                                      </Field>
+                                    </div>
+                                  )}
                                   {ref && hint && (
                                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
                                       <span>
@@ -330,7 +404,16 @@ const DietPlanForm = ({ patientId, plan }: { patientId: string; plan: DietPlan }
                                           ` · ${servings} servings: ${nutrientText(Math.round(ref.kcal * servings), Math.round(ref.proteinG * servings * 10) / 10)}`}
                                       </span>
                                       {servings !== null && (
-                                        <ServingsInput value={servings} onChange={(n) => updateOption(i, k, { quantity: withServings(n, ref.serving) })} />
+                                        <ServingsInput
+                                          value={servings}
+                                          onChange={(n) =>
+                                            updateOption(i, k, {
+                                              quantity: withServings(n, ref.serving),
+                                              ...(FOOD_NUTRIENTS &&
+                                                autoNutrients({ kcal: o.kcal, protein: o.protein }, autoNutrientsFor(ref, servings), autoNutrientsFor(ref, n))),
+                                            })
+                                          }
+                                        />
                                       )}
                                     </div>
                                   )}

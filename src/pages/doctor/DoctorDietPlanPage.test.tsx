@@ -9,6 +9,12 @@ import { DoctorDietPlanPage } from './DoctorDietPlanPage';
 import type { DietPlan } from '../../types/api';
 
 const { updatePlan, getPlan } = vi.hoisted(() => ({ updatePlan: vi.fn(), getPlan: vi.fn() }));
+const flags = vi.hoisted(() => ({ food: false }));
+vi.mock('../../lib/features', () => ({
+  get FOOD_NUTRIENTS() {
+    return flags.food;
+  },
+}));
 
 vi.mock('../../services/apiServices', () => ({
   nutritionService: {
@@ -84,6 +90,7 @@ const mealParts = (name: string) => {
 };
 
 beforeEach(() => {
+  flags.food = false;
   updatePlan.mockReset();
   updatePlan.mockResolvedValue({});
   getPlan.mockReset();
@@ -538,3 +545,94 @@ describe('diet plan page: reference servings', () => {
     expect(panel.queryByLabelText('Servings')).toBeNull();
   });
 });
+
+describe('diet plan page: per-food kcal and protein', () => {
+  beforeEach(() => {
+    flags.food = true;
+  });
+
+  // Lunch with a third, empty food: "Roti / Chapati" is typed into it
+  const openLunchWithRoti = async (user: ReturnType<typeof userEvent.setup>) => {
+    await renderPage();
+    await user.click(mealParts('Lunch').header);
+    const panel = within(mealParts('Lunch').panel);
+    fireEvent.click(panel.getByRole('button', { name: 'Add food' }));
+    fireEvent.change(panel.getAllByLabelText('Food')[2]!, { target: { value: 'Roti / Chapati' } });
+    return panel;
+  };
+
+  it('fills the food kcal and protein from the reference, and rescales them with the servings', async () => {
+    const user = userEvent.setup();
+    const panel = await openLunchWithRoti(user);
+    expect(panel.getAllByLabelText('Food kcal')[2]).toHaveValue(80);
+    expect(panel.getAllByLabelText('Food protein (g)')[2]).toHaveValue(3);
+    fireEvent.change(panel.getByLabelText('Servings'), { target: { value: '2' } });
+    expect(panel.getAllByLabelText('Food kcal')[2]).toHaveValue(160);
+    expect(panel.getAllByLabelText('Food protein (g)')[2]).toHaveValue(6);
+  });
+
+  it('never overwrites a food kcal the doctor typed when the servings change', async () => {
+    const user = userEvent.setup();
+    const panel = await openLunchWithRoti(user);
+    fireEvent.change(panel.getAllByLabelText('Food kcal')[2]!, { target: { value: '90' } });
+    fireEvent.change(panel.getByLabelText('Servings'), { target: { value: '2' } });
+    expect(panel.getAllByLabelText('Food kcal')[2]).toHaveValue(90);
+    expect(panel.getAllByLabelText('Food protein (g)')[2]).toHaveValue(6);
+  });
+
+  it('makes the meal kcal and protein read-only sums, and saves the sums', async () => {
+    const user = userEvent.setup();
+    const withValues = {
+      ...plan,
+      slots: [
+        plan.slots[0]!,
+        {
+          ...plan.slots[1]!,
+          options: [
+            { code: 'ROTI', label: { en: 'Roti', hi: 'रोटी' }, quantity: '2 × 1 medium (30 g)', kind: 'OPTION', kcal: 160, proteinG: 6 },
+            { code: 'DAL', label: { en: 'Dal', hi: null }, quantity: '1 katori', kind: 'OPTION', kcal: 150, proteinG: 9 },
+          ],
+        },
+      ],
+    } as unknown as DietPlan;
+    getPlan.mockResolvedValue(withValues);
+    await renderPage();
+    expect(mealParts('Lunch').header.closest('li')).toHaveTextContent('310 kcal · 15 g');
+    await user.click(mealParts('Lunch').header);
+    const panel = within(mealParts('Lunch').panel);
+    expect(panel.getByLabelText('kcal')).toHaveAttribute('readonly');
+    expect(panel.getByLabelText('kcal')).toHaveValue(310);
+    expect(panel.getByLabelText('Protein (g)')).toHaveValue(15);
+    expect(panel.getAllByText('Sum of the foods')).toHaveLength(2);
+    await user.click(screen.getByRole('button', { name: 'Save diet plan' }));
+    const [, body] = updatePlan.mock.calls[0] as [string, { slots: { kcal: number; proteinG: number; options: object[] }[] }];
+    expect(body.slots[1]).toMatchObject({ kcal: 310, proteinG: 15 });
+    expect(body.slots[1]!.options[0]).toEqual({ code: 'ROTI', label: { en: 'Roti', hi: 'रोटी' }, quantity: '2 × 1 medium (30 g)', kind: 'OPTION', kcal: 160, proteinG: 6 });
+  });
+
+  it('keeps an old plan with no food values editable at its saved meal kcal', async () => {
+    const user = userEvent.setup();
+    await renderPage();
+    await user.click(mealParts('Lunch').header);
+    const panel = within(mealParts('Lunch').panel);
+    expect(panel.getByLabelText('kcal')).not.toHaveAttribute('readonly');
+    expect(panel.getByLabelText('kcal')).toHaveValue(800);
+    expect(panel.getAllByText('Add kcal and protein to every food to total this meal')).toHaveLength(2);
+    await user.click(screen.getByRole('button', { name: 'Save diet plan' }));
+    const [, body] = updatePlan.mock.calls[0] as [string, { slots: { kcal: number; options: object[] }[] }];
+    expect(body.slots[1]!.kcal).toBe(800);
+    expect(body.slots[1]!.options[0]).toMatchObject({ kcal: null, proteinG: null });
+  });
+});
+
+describe('diet plan page: per-food kcal and protein off', () => {
+  it('shows no food kcal inputs and sends no food nutrient keys', async () => {
+    const user = userEvent.setup();
+    await renderPage();
+    expect(screen.queryAllByLabelText('Food kcal')).toHaveLength(0);
+    await user.click(screen.getByRole('button', { name: 'Save diet plan' }));
+    const [, body] = updatePlan.mock.calls[0] as [string, { slots: { options: object[] }[] }];
+    for (const slot of body.slots) for (const o of slot.options) expect(o).not.toHaveProperty('kcal');
+  });
+});
+

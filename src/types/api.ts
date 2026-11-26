@@ -373,6 +373,9 @@ export interface FoodOption {
   label: BiText;
   quantity: string;
   kind: 'OPTION' | 'ADDON';
+  /** Draft (behind VITE_FOOD_NUTRIENTS): this food's kcal and protein. Null or absent when unknown. */
+  kcal?: number | null;
+  proteinG?: number | null;
 }
 
 export interface MealSlot {

@@ -1,8 +1,15 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { setLang } from '../../lib/i18n';
 import { MealSlots } from './MealDay';
 import type { MealDay } from '../../types/api';
+
+const flags = vi.hoisted(() => ({ food: false }));
+vi.mock('../../lib/features', () => ({
+  get FOOD_NUTRIENTS() {
+    return flags.food;
+  },
+}));
 
 const day = {
   slots: [
@@ -22,6 +29,24 @@ const day = {
 
 beforeEach(() => {
   setLang('en');
+  flags.food = false;
+});
+
+describe('per-food nutrients', () => {
+  const withFood = {
+    slots: [{ ...day.slots[0]!, options: [{ code: 'ROTI', label: { en: 'Roti', hi: null }, quantity: '1 medium', kind: 'OPTION', ticked: false, kcal: 80, proteinG: 3 }] }],
+  } as unknown as MealDay;
+
+  it('shows a food\'s kcal and protein after its quantity when the flag is on', () => {
+    flags.food = true;
+    render(<MealSlots day={withFood} />);
+    expect(screen.getByText('80 kcal · 3 g')).toBeInTheDocument();
+  });
+
+  it('shows nothing extra when the flag is off', () => {
+    render(<MealSlots day={withFood} />);
+    expect(screen.queryByText('80 kcal · 3 g')).not.toBeInTheDocument();
+  });
 });
 
 describe('meal advice display', () => {
