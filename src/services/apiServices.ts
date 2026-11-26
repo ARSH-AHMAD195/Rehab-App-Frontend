@@ -1,5 +1,6 @@
 import { api, type QueryParams } from './api';
 import type {
+  AdviceHistory,
   AlertThreshold,
   CareAlert,
   CaseloadRow,
@@ -55,6 +56,7 @@ export const profileService = {
     api.patch<Profile>('/users/me/profile', data),
   getMyMedical: () => api.get<MedicalProfile>('/patients/me/medical-profile'),
   updateMyMedical: (data: MedicalUpdate) => api.patch<MedicalProfile>('/patients/me/medical-profile', data),
+  getMyAdviceHistory: () => api.get<AdviceHistory>('/patients/me/medical-profile/advice-history'),
 };
 
 export const patientService = {
@@ -75,6 +77,7 @@ export const patientService = {
   createLoginCode: (id: Id) => api.post<LoginCode>(`/patients/${id}/login-code`),
   getMedical: (id: Id) => api.get<MedicalProfile>(`/patients/${id}/medical-profile`),
   updateMedical: (id: Id, data: MedicalUpdate) => api.patch<MedicalProfile>(`/patients/${id}/medical-profile`, data),
+  getAdviceHistory: (id: Id) => api.get<AdviceHistory>(`/patients/${id}/medical-profile/advice-history`),
 };
 
 export const loginCodeService = {

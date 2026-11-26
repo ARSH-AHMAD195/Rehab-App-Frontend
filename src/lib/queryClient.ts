@@ -32,6 +32,7 @@ export const qk = {
   myLogs: ['my', 'vitals', 'logs'] as const,
   myMeals: ['my', 'meals', 'today'] as const,
   myMealHistory: ['my', 'meals', 'history'] as const,
+  myAdviceHistory: ['my', 'adviceHistory'] as const,
   myTrend: (type: string, period: string) => ['my', 'vitals', 'trend', type, period] as const,
   patients: (params: object) => ['patients', params] as const,
   alerts: (params: object) => ['alerts', params] as const,

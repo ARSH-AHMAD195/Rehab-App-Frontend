@@ -8,8 +8,10 @@ import { useFormErrors } from '../../lib/forms';
 import { cn } from '../../lib/cn';
 import { dateKeyIn, formatDate, labelize } from '../../lib/format';
 import { formatResult, GROUP_TITLES, testUnits } from '../../lib/investigations';
+import { ADVICE_HISTORY } from '../../lib/features';
 import { qk } from '../../lib/queryClient';
 import { Alert, Button, buttonClass, Card, ConfirmDialog, Field, Input, Modal, ModalActions, PageLoader, SectionTitle, Select, Textarea } from '../ui';
+import { AdviceHistory } from '../health/AdviceHistory';
 import { useToast } from '../ui/toast';
 import type { InvestigationField, InvestigationGroup, InvestigationResult, InvestigationTest, MedicalProfile } from '../../types/api';
 
@@ -164,6 +166,13 @@ const notesValue = (text: string, field: NotesField) => {
   return lines.length ? lines : null;
 };
 const notesKey = (text: string, field: NotesField) => [notesValue(text, field)].flat().join('\n');
+
+/** Every past save of the patient's advice. Mounted only behind VITE_ADVICE_HISTORY, so nothing is fetched when off. */
+const DoctorAdviceHistory = ({ patientId }: { patientId: string }) => {
+  const history = useQuery({ queryKey: qk.patientPart(patientId, 'adviceHistory'), queryFn: () => patientService.getAdviceHistory(patientId) });
+  if (!history.data?.items.length) return null;
+  return <AdviceHistory items={history.data.items} title="Advice history" cleared="Cleared" />;
+};
 
 /** Saves one field (the medications, or the doctors' notes) from its card, instead of the whole medical details form. */
 const NotesCard = ({ patientId, medical, field }: { patientId: string; medical: MedicalProfile; field: NotesField }) => {
@@ -326,6 +335,7 @@ export const InvestigationsPanel = ({ patientId, medical }: { patientId: string;
       {medical && <NotesCard patientId={patientId} medical={medical} field="medications" />}
       {medical && <NotesCard patientId={patientId} medical={medical} field="clinicalNotes" />}
       {medical && <NotesCard patientId={patientId} medical={medical} field="patientAdvice" />}
+      {ADVICE_HISTORY && <DoctorAdviceHistory patientId={patientId} />}
 
       {adding && <AddResultModal patientId={patientId} test={adding} onClose={() => setAdding(null)} />}
       {retracting && (

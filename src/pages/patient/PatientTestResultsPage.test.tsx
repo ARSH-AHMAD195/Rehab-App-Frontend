@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { setLang } from '../../lib/i18n';
+import { formatDateTime } from '../../lib/format';
 import { PatientTestResultsPage } from './PatientTestResultsPage';
 
 const result = (id: string, takenOn: string, values: Record<string, number | string>, extra = {}) => ({
@@ -10,13 +11,20 @@ const result = (id: string, takenOn: string, values: Record<string, number | str
 
 let grid: unknown[] = [];
 let medical: () => Promise<unknown> = () => Promise.resolve({ patientAdvice: null });
-const { getMedical } = vi.hoisted(() => ({ getMedical: vi.fn() }));
+let history: () => Promise<unknown> = () => Promise.resolve({ items: [] });
+const { getMedical, getHistory } = vi.hoisted(() => ({ getMedical: vi.fn(), getHistory: vi.fn() }));
+const flags = vi.hoisted(() => ({ history: false }));
+vi.mock('../../lib/features', () => ({
+  get ADVICE_HISTORY() {
+    return flags.history;
+  },
+}));
 vi.mock('../../services/apiServices', () => ({
   clinicalService: {
     getTests: () => Promise.resolve([{ code: 'HB', label: 'Haemoglobin', fields: [{ key: 'value', label: 'Value', kind: 'number', unit: 'g/dL' }] }]),
     getMyInvestigations: () => Promise.resolve(grid),
   },
-  profileService: { getMyMedical: () => getMedical() },
+  profileService: { getMyMedical: () => getMedical(), getMyAdviceHistory: () => getHistory() },
 }));
 
 const renderPage = () =>
@@ -28,9 +36,13 @@ const renderPage = () =>
 
 beforeEach(() => {
   grid = [];
+  flags.history = false;
   medical = () => Promise.resolve({ patientAdvice: null });
   getMedical.mockReset();
   getMedical.mockImplementation(() => medical());
+  history = () => Promise.resolve({ items: [] });
+  getHistory.mockReset();
+  getHistory.mockImplementation(() => history());
   setLang('en');
 });
 
@@ -117,3 +129,65 @@ describe('advice from the doctor', () => {
     expect(screen.queryByRole('heading', { name: 'Advice from your doctor' })).not.toBeInTheDocument();
   });
 });
+
+describe('earlier advice', () => {
+  const withResult = () => {
+    grid = [{ test: 'HB', label: 'Haemoglobin', group: 'HAEMATOLOGY', results: [result('a', '2026-11-21', { value: 11 })] }];
+  };
+  const items = [
+    { advice: ' Stop aspirin ', at: '2026-11-21T09:30:00Z', by: { name: 'Dr Nair' } },
+    { advice: 'Take your inhaler', at: '2026-11-19T08:00:00Z', by: null },
+    { advice: null, at: '2026-11-18T08:00:00Z', by: null },
+  ];
+
+  it('is never requested when the flag is off', async () => {
+    withResult();
+    renderPage();
+    await screen.findByText('Haemoglobin');
+    expect(getHistory).not.toHaveBeenCalled();
+  });
+
+  it('shows past saves newest first with dates, and Cleared for a cleared save', async () => {
+    flags.history = true;
+    withResult();
+    history = () => Promise.resolve({ items: items.slice(1) });
+    renderPage();
+    expect(await screen.findByRole('heading', { name: 'Earlier advice' })).toBeInTheDocument();
+    const list = within(screen.getByRole('heading', { name: 'Earlier advice' }).closest('section')!).getAllByRole('listitem');
+    expect(list[0]).toHaveTextContent(`${formatDateTime('2026-11-19T08:00:00Z')}`);
+    expect(list[0]).toHaveTextContent('Take your inhaler');
+    expect(list[1]).toHaveTextContent('Cleared');
+  });
+
+  it('does not repeat the current advice when it equals the newest save', async () => {
+    flags.history = true;
+    withResult();
+    medical = () => Promise.resolve({ patientAdvice: 'Stop aspirin' });
+    history = () => Promise.resolve({ items });
+    renderPage();
+    expect(await screen.findByRole('heading', { name: 'Earlier advice' })).toBeInTheDocument();
+    expect(screen.getAllByText('Stop aspirin')).toHaveLength(1);
+    expect(screen.getByText('Take your inhaler')).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem').filter((li) => li.textContent?.includes('Cleared'))).toHaveLength(1);
+  });
+
+  it('shows the earlier advice when there is no current advice', async () => {
+    flags.history = true;
+    withResult();
+    history = () => Promise.resolve({ items: items.slice(0, 1) });
+    renderPage();
+    expect(await screen.findByRole('heading', { name: 'Earlier advice' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Advice from your doctor' })).not.toBeInTheDocument();
+  });
+
+  it('shows nothing extra when the history fails, and the results still show', async () => {
+    flags.history = true;
+    withResult();
+    history = () => Promise.reject(new Error('boom'));
+    renderPage();
+    expect(await screen.findByText('Haemoglobin')).toBeInTheDocument();
+    await vi.waitFor(() => expect(getHistory).toHaveBeenCalled());
+    expect(screen.queryByRole('heading', { name: 'Earlier advice' })).not.toBeInTheDocument();
+  });
+});
+
