@@ -5,10 +5,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { ToastProvider } from '../ui/toast';
 import { InvestigationsPanel } from './InvestigationsPanel';
+import { formatDateTime } from '../../lib/format';
 import { TriageCard } from './TriageCard';
 import type { MedicalProfile, Triage } from '../../types/api';
 
 const updateMedical = vi.fn();
+const getAdviceHistory = vi.fn();
 
 const triage: Triage = {
   patientId: 'p1',
@@ -30,7 +32,10 @@ vi.mock('../../services/apiServices', () => ({
     getTests: () => Promise.resolve([]),
     getInvestigations: () => Promise.resolve([]),
   },
-  patientService: { updateMedical: (...args: unknown[]) => updateMedical(...args) },
+  patientService: {
+    updateMedical: (...args: unknown[]) => updateMedical(...args),
+    getAdviceHistory: (...args: unknown[]) => getAdviceHistory(...args),
+  },
 }));
 
 const medical = { patientId: 'p1', medications: ['Metformin 500 mg'], clinicalNotes: null, version: 3 } as unknown as MedicalProfile;
@@ -44,8 +49,18 @@ const renderWith = (ui: React.ReactNode) =>
     </QueryClientProvider>
   );
 
+const flags = vi.hoisted(() => ({ history: false }));
+vi.mock('../../lib/features', () => ({
+  get ADVICE_HISTORY() {
+    return flags.history;
+  },
+}));
+
 beforeEach(() => {
+  flags.history = false;
   updateMedical.mockReset();
+  getAdviceHistory.mockReset();
+  getAdviceHistory.mockResolvedValue({ items: [] });
 });
 
 describe('triage reasons', () => {
@@ -112,5 +127,55 @@ describe('advice for the patient', () => {
     await vi.waitFor(() => expect(updateMedical).toHaveBeenCalledTimes(1));
     const body = updateMedical.mock.calls[0]![1] as Record<string, unknown>;
     expect(Object.keys(body).sort()).toEqual(['clinicalNotes', 'version']);
+  });
+});
+
+describe('advice history', () => {
+  const historyItems = [
+    { advice: 'Stop aspirin 5 days before', at: '2026-11-21T09:30:00Z', by: { name: 'Dr Nair' } },
+    { advice: null, at: '2026-11-20T08:00:00Z', by: null },
+  ];
+
+  it('is never requested when the flag is off', async () => {
+    renderWith(<InvestigationsPanel patientId="p1" medical={medical} />);
+    await screen.findByRole('heading', { name: 'Advice for the patient' });
+    expect(getAdviceHistory).not.toHaveBeenCalled();
+    expect(screen.queryByRole('heading', { name: 'Advice history' })).not.toBeInTheDocument();
+  });
+
+  it('shows every save, newest first, with the date, the saver and Cleared', async () => {
+    flags.history = true;
+    getAdviceHistory.mockResolvedValue({ items: historyItems });
+    renderWith(<InvestigationsPanel patientId="p1" medical={medical} />);
+    expect(await screen.findByRole('heading', { name: 'Advice history' })).toBeInTheDocument();
+    expect(getAdviceHistory).toHaveBeenCalledWith('p1');
+    const items = within(screen.getByRole('heading', { name: 'Advice history' }).closest('section')!).getAllByRole('listitem');
+    expect(items).toHaveLength(2);
+    expect(items[0]).toHaveTextContent(`${formatDateTime('2026-11-21T09:30:00Z')} · Dr Nair`);
+    expect(items[0]).toHaveTextContent('Stop aspirin 5 days before');
+    expect(items[1]).toHaveTextContent('Cleared');
+  });
+
+  it('shows nothing when the history is empty or fails', async () => {
+    flags.history = true;
+    getAdviceHistory.mockRejectedValue(new Error('boom'));
+    renderWith(<InvestigationsPanel patientId="p1" medical={medical} />);
+    await screen.findByRole('heading', { name: 'Advice for the patient' });
+    await vi.waitFor(() => expect(getAdviceHistory).toHaveBeenCalled());
+    expect(screen.queryByRole('heading', { name: 'Advice history' })).not.toBeInTheDocument();
+  });
+
+  it('refetches the history after the advice is saved', async () => {
+    flags.history = true;
+    const user = userEvent.setup();
+    getAdviceHistory.mockResolvedValueOnce({ items: [] }).mockResolvedValue({ items: historyItems });
+    updateMedical.mockResolvedValue({ ...medical, patientAdvice: 'Stop aspirin', version: 4 });
+    renderWith(<InvestigationsPanel patientId="p1" medical={medical} />);
+    await vi.waitFor(() => expect(getAdviceHistory).toHaveBeenCalledTimes(1));
+    const box = screen.getByRole('textbox', { name: /^Advice/ });
+    await user.type(box, 'Stop aspirin 5 days before');
+    await user.click(within(box.closest('form')!).getByRole('button', { name: 'Save' }));
+    expect(await screen.findByRole('heading', { name: 'Advice history' })).toBeInTheDocument();
+    expect(getAdviceHistory).toHaveBeenCalledTimes(2);
   });
 });

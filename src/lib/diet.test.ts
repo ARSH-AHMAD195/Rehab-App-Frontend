@@ -1,6 +1,13 @@
-import { describe, expect, it } from 'vitest';
-import { kcalGap, newCode, nutrientText, servingsOf, sumMeals, toRows, toSlots, withServings, type SlotRow } from './diet';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { autoNutrients, autoNutrientsFor, emptyOption, foodsComplete, kcalGap, mealValues, newCode, nutrientText, servingsOf, sumMeals, toRows, toSlots, withServings, type SlotRow } from './diet';
 import type { MealSlot } from '../types/api';
+
+const flags = vi.hoisted(() => ({ food: false }));
+vi.mock('./features', () => ({
+  get FOOD_NUTRIENTS() {
+    return flags.food;
+  },
+}));
 
 describe('newCode', () => {
   it('makes an API code from a name', () => {
@@ -44,7 +51,7 @@ describe('diet plan form', () => {
 
   it('gives a new food no Hindi and a main-option kind', () => {
     const rows = toRows(saved);
-    rows[0]!.options.push({ code: '', en: 'Dal', hi: '', quantity: '1 katori' });
+    rows[0]!.options.push({ code: '', en: 'Dal', hi: '', quantity: '1 katori', kcal: '', protein: '' });
     expect(toSlots(rows)[0]!.options[2]).toEqual({ code: 'DAL', label: { en: 'Dal', hi: null }, quantity: '1 katori', kind: 'OPTION' });
   });
 });
@@ -136,3 +143,83 @@ describe('reference servings', () => {
     expect(withServings(2, '1 medium (30 g)')).toBe('2 × 1 medium (30 g)');
   });
 });
+
+describe('per-food kcal and protein', () => {
+  beforeEach(() => {
+    flags.food = false;
+  });
+
+  // Roti 2 × 160 kcal / 6 g and dal 150 kcal / 9 g: the meal is 310 kcal and 15 g. The typed 900 kcal / 99 g is replaced when on.
+  const withFoods = (): MealSlot[] => [
+    {
+      ...saved[0]!,
+      kcal: 900,
+      proteinG: 99,
+      options: [
+        { code: 'ROTI', label: { en: 'Roti', hi: null }, quantity: '2 × 1 medium (30 g)', kind: 'OPTION', kcal: 160, proteinG: 6 },
+        { code: 'DAL', label: { en: 'Dal', hi: null }, quantity: '1 katori', kind: 'OPTION', kcal: 150, proteinG: 9 },
+      ],
+    },
+  ];
+
+  it('round-trips each food value through the form', () => {
+    flags.food = true;
+    expect(toRows(withFoods())[0]!.options.map((o) => [o.kcal, o.protein])).toEqual([
+      ['160', '6'],
+      ['150', '9'],
+    ]);
+    expect(toSlots(toRows(withFoods()))).toEqual(withFoods().map((s) => ({ ...s, kcal: 310, proteinG: 15, advice: null })));
+  });
+
+  it('makes the meal kcal and protein the sum of its foods when every food has values', () => {
+    flags.food = true;
+    const rows = toRows(withFoods());
+    expect(foodsComplete(rows[0]!)).toBe(true);
+    expect(toSlots(rows)[0]).toMatchObject({ kcal: 310, proteinG: 15 });
+    expect(sumMeals(rows)).toEqual({ kcal: 310, protein: 15 });
+  });
+
+  it('keeps the typed meal values when a food is missing its kcal, and sends that food as null', () => {
+    flags.food = true;
+    const rows = toRows(withFoods());
+    rows[0]!.options[1]!.kcal = '';
+    expect(foodsComplete(rows[0]!)).toBe(false);
+    const [slot] = toSlots(rows);
+    expect(slot).toMatchObject({ kcal: 900, proteinG: 99 });
+    expect(slot!.options[1]).toMatchObject({ kcal: null, proteinG: 9 });
+    expect(sumMeals(rows)).toEqual({ kcal: 900, protein: 99 });
+  });
+
+  it('is not complete without a named food', () => {
+    flags.food = true;
+    expect(foodsComplete({ ...toRows(withFoods())[0]!, options: [] })).toBe(false);
+    expect(foodsComplete({ ...toRows(withFoods())[0]!, options: [emptyOption()] })).toBe(false);
+  });
+
+  it('with the flag off sends no food nutrient keys and keeps the typed meal values', () => {
+    const rows = toRows(withFoods());
+    const [slot] = toSlots(rows);
+    for (const o of slot!.options) {
+      expect(o).not.toHaveProperty('kcal');
+      expect(o).not.toHaveProperty('proteinG');
+    }
+    expect(slot).toMatchObject({ kcal: 900, proteinG: 99 });
+    expect(mealValues(rows[0]!)).toEqual({ kcal: 900, protein: 99 });
+  });
+
+  it('gives the auto values of a reference food for its servings', () => {
+    expect(autoNutrientsFor({ kcal: 80, proteinG: 3 }, 2)).toEqual({ kcal: '160', protein: '6' });
+    expect(autoNutrientsFor({ kcal: 80, proteinG: 3 }, null)).toBeNull();
+    expect(autoNutrientsFor(undefined, 1)).toBeNull();
+  });
+
+  it('replaces only the blank or still-auto values, never a typed one', () => {
+    const was = { kcal: '80', protein: '3' };
+    const next = { kcal: '160', protein: '6' };
+    expect(autoNutrients({ kcal: '', protein: '' }, null, next)).toEqual(next);
+    expect(autoNutrients({ kcal: '80', protein: '3' }, was, next)).toEqual(next);
+    expect(autoNutrients({ kcal: '90', protein: '3' }, was, next)).toEqual({ kcal: '90', protein: '6' });
+    expect(autoNutrients({ kcal: '90', protein: '3' }, null, next)).toEqual({ kcal: '90', protein: '3' });
+  });
+});
+

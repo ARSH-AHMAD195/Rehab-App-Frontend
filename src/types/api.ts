@@ -168,6 +168,17 @@ export interface MedicalProfile extends MedicalFields {
   updatedBy: { id: Id; role: string } | null;
 }
 
+/** One save of patientAdvice. `advice: null` = cleared in that save. Newest first. (behind VITE_ADVICE_HISTORY) */
+export interface AdviceHistoryItem {
+  advice: string | null;
+  at: IsoDate;
+  by: { name: string } | null;
+}
+
+export interface AdviceHistory {
+  items: AdviceHistoryItem[];
+}
+
 // ---------- Health Monitoring API ----------
 
 export type VitalType = 'BP' | 'PULSE' | 'SPO2' | 'TEMP' | 'WEIGHT' | 'SUGAR' | 'PAIN' | 'WALK_MIN' | 'STEPS' | 'SLEEP_HRS' | 'NUTRITION' | 'WATER_ML' | 'MOOD';
@@ -362,6 +373,9 @@ export interface FoodOption {
   label: BiText;
   quantity: string;
   kind: 'OPTION' | 'ADDON';
+  /** Draft (behind VITE_FOOD_NUTRIENTS): this food's kcal and protein. Null or absent when unknown. */
+  kcal?: number | null;
+  proteinG?: number | null;
 }
 
 export interface MealSlot {
