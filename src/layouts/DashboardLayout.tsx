@@ -9,6 +9,7 @@ import { IdleLogout } from '../components/IdleLogout';
 import { idleSignOutApplies } from '../lib/idle';
 import { InstallButton } from '../components/pwa/PwaPrompts';
 import { cn } from '../lib/cn';
+import { showsSideMenu } from '../lib/layout';
 import { firstName, initials } from '../lib/format';
 import { syncLanguage, t, useLang, usePatientLanguage, type Lang } from '../lib/i18n';
 import { LanguageSwitch } from '../components/common/LanguageSwitch';
@@ -171,7 +172,7 @@ export const DashboardLayout = () => {
         {t('Skip to main content')}
       </a>
 
-      <aside className="hidden w-72 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex print:hidden">
+      <aside className={cn('hidden w-72 shrink-0 flex-col border-r border-slate-200 bg-white print:hidden', showsSideMenu(pathname) && 'lg:flex')}>
         <div className="flex items-center gap-3 border-b border-slate-100 p-5">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-teal-800 to-teal-600 text-white shadow-md">
             <Heart className="h-5 w-5 fill-white/20" aria-hidden="true" />

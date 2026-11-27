@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { clinicalService, profileService } from '../../services/apiServices';
 import { formatDate } from '../../lib/format';
-import { PATIENT_ADVICE } from '../../lib/features';
 import { qk } from '../../lib/queryClient';
 import { formatResult, GROUP_TITLES, testUnits } from '../../lib/investigations';
 import { t, useLang } from '../../lib/i18n';
@@ -11,16 +10,16 @@ import type { InvestigationGroup } from '../../types/api';
 /**
  * The patient's test results, read-only. Deliberately no out-of-range flags, red colouring or per-result doctor comments:
  * the client hasn't decided whether patients see those (clinical decision). The doctor's general advice
- * (medical profile `patientAdvice`, behind VITE_PATIENT_ADVICE) is shown at the top.
+ * (medical profile `patientAdvice`) is shown at the top.
  */
 export const PatientTestResultsPage = () => {
   useLang();
   const tests = useQuery({ queryKey: qk.investigationTests, queryFn: clinicalService.getTests, staleTime: Infinity });
   const grid = useQuery({ queryKey: qk.myInvestigations, queryFn: clinicalService.getMyInvestigations });
 
-  // Optional: a failed or disabled query just means no advice card
-  const medical = useQuery({ queryKey: qk.myMedical, queryFn: profileService.getMyMedical, enabled: PATIENT_ADVICE });
-  const advice = PATIENT_ADVICE ? medical.data?.patientAdvice?.trim() : '';
+  // Optional: a failed query just means no advice card
+  const medical = useQuery({ queryKey: qk.myMedical, queryFn: profileService.getMyMedical });
+  const advice = medical.data?.patientAdvice?.trim();
 
   if (tests.isPending || grid.isPending) return <PageLoader label={t('Loading your test results…')} />;
   if (tests.isError || grid.isError) {

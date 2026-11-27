@@ -8,7 +8,6 @@ import { useFormErrors } from '../../lib/forms';
 import { cn } from '../../lib/cn';
 import { dateKeyIn, formatDate, labelize } from '../../lib/format';
 import { formatResult, GROUP_TITLES, testUnits } from '../../lib/investigations';
-import { PATIENT_ADVICE } from '../../lib/features';
 import { qk } from '../../lib/queryClient';
 import { Alert, Button, buttonClass, Card, ConfirmDialog, Field, Input, Modal, ModalActions, PageLoader, SectionTitle, Select, Textarea } from '../ui';
 import { useToast } from '../ui/toast';
@@ -326,7 +325,7 @@ export const InvestigationsPanel = ({ patientId, medical }: { patientId: string;
 
       {medical && <NotesCard patientId={patientId} medical={medical} field="medications" />}
       {medical && <NotesCard patientId={patientId} medical={medical} field="clinicalNotes" />}
-      {medical && PATIENT_ADVICE && <NotesCard patientId={patientId} medical={medical} field="patientAdvice" />}
+      {medical && <NotesCard patientId={patientId} medical={medical} field="patientAdvice" />}
 
       {adding && <AddResultModal patientId={patientId} test={adding} onClose={() => setAdding(null)} />}
       {retracting && (

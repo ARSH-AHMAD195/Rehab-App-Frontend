@@ -1,16 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { kcalGap, newCode, nutrientText, sumMeals, toRows, toSlots, type SlotRow } from './diet';
+import { describe, expect, it } from 'vitest';
+import { kcalGap, newCode, nutrientText, servingsOf, sumMeals, toRows, toSlots, withServings, type SlotRow } from './diet';
 import type { MealSlot } from '../types/api';
-
-const flags = vi.hoisted(() => ({ meal: false }));
-vi.mock('./features', () => ({
-  get MEAL_ADVICE() {
-    return flags.meal;
-  },
-}));
-beforeEach(() => {
-  flags.meal = false;
-});
 
 describe('newCode', () => {
   it('makes an API code from a name', () => {
@@ -101,8 +91,7 @@ describe('meal advice', () => {
     expect(toRows(saved)[0]!.advice).toBe('');
   });
 
-  it('sends trimmed advice, or null when blank, with the flag on', () => {
-    flags.meal = true;
+  it('sends trimmed advice, or null when blank', () => {
     const rows = toRows(saved);
     rows[0]!.advice = '  Eat slowly  ';
     expect(toSlots(rows)[0]!.advice).toBe('Eat slowly');
@@ -111,7 +100,6 @@ describe('meal advice', () => {
   });
 
   it('keeps a 500-character advice unchanged through toRows then toSlots, and again on the next load', () => {
-    flags.meal = true;
     const advice = 'Eat slowly.\n' + 'x'.repeat(488);
     expect(advice).toHaveLength(500);
     const once = toSlots(toRows([{ ...saved[0]!, advice }]));
@@ -120,7 +108,6 @@ describe('meal advice', () => {
   });
 
   it('trims advice on the way out, and a reload changes nothing more', () => {
-    flags.meal = true;
     const rows = toRows(saved);
     rows[0]!.advice = '  Take with water \n';
     const first = toSlots(rows);
@@ -128,9 +115,24 @@ describe('meal advice', () => {
     expect(toSlots(toRows(first))).toEqual(first);
   });
 
-  it('leaves the advice key out entirely with the flag off', () => {
-    const rows = toRows(saved);
-    rows[0]!.advice = 'Eat slowly';
-    expect(toSlots(rows)[0]).not.toHaveProperty('advice');
+});
+
+describe('reference servings', () => {
+  it('reads a whole or half serving count from the quantity', () => {
+    expect(servingsOf('1 medium (30 g)', '1 medium (30 g)')).toBe(1);
+    expect(servingsOf('2 × 1 medium (30 g)', '1 medium (30 g)')).toBe(2);
+    expect(servingsOf('1.5 × 1 medium (30 g)', '1 medium (30 g)')).toBe(1.5);
+  });
+
+  it('gives null for a hand-typed quantity, another serving, or a count out of range', () => {
+    expect(servingsOf('2 rotis', '1 medium (30 g)')).toBeNull();
+    expect(servingsOf('2 × 1 katori', '1 medium (30 g)')).toBeNull();
+    expect(servingsOf('0 × 1 medium (30 g)', '1 medium (30 g)')).toBeNull();
+    expect(servingsOf('21 × 1 medium (30 g)', '1 medium (30 g)')).toBeNull();
+  });
+
+  it('writes the count into the quantity, leaving one serving as it is', () => {
+    expect(withServings(1, '1 medium (30 g)')).toBe('1 medium (30 g)');
+    expect(withServings(2, '1 medium (30 g)')).toBe('2 × 1 medium (30 g)');
   });
 });

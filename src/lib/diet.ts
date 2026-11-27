@@ -1,5 +1,16 @@
 import type { MealSlot } from '../types/api';
-import { MEAL_ADVICE } from './features';
+
+export const MAX_SERVINGS = 20;
+/** How many reference servings a quantity is: "1 medium (30 g)" → 1, "2 × 1 medium (30 g)" → 2. null for a hand-typed quantity. */
+export const servingsOf = (quantity: string, serving: string): number | null => {
+  const q = quantity.trim();
+  if (q === serving) return 1;
+  const m = /^(\d+(?:\.\d+)?) × (.+)$/.exec(q);
+  const n = m && m[2] === serving ? Number(m[1]) : NaN;
+  return n > 0 && n <= MAX_SERVINGS ? n : null;
+};
+/** Quantity text for n servings; the count lives in the quantity so it is saved and the patient sees it. */
+export const withServings = (n: number, serving: string) => (n === 1 ? serving : `${n} × ${serving}`);
 
 /**
  * A code for a new meal slot or food option, from its English name: "Evening snack" → "EVENING_SNACK".
@@ -71,8 +82,7 @@ export const toSlots = (rows: SlotRow[]): MealSlot[] => {
       window: `${r.from}-${r.to}`,
       kcal: Number(r.kcal),
       proteinG: Number(r.protein),
-      // The live backend rejects unknown fields, so the key is left out entirely while the flag is off
-      ...(MEAL_ADVICE && { advice: r.advice.trim() || null }),
+      advice: r.advice.trim() || null,
       options: r.options.map((o) => {
         const optionCode = o.code || newCode(o.en, optionCodes);
         if (!o.code) optionCodes.push(optionCode);
